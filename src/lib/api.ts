@@ -8,6 +8,16 @@ import type {
 } from '../types';
 
 const REQUEST_TIMEOUT_MS = 120_000;
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 1500;
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function classifyFetchError(err: unknown, url?: string): Promise<Error> {
   if (err instanceof DOMException && err.name === 'AbortError') {
@@ -83,17 +93,22 @@ The current date is {{CURRENT_DATE}}.
  - Knowledge cutoff: 2025-08
  - Context window: 1M`;
 
+export async function preloadSystemPrompt(): Promise<void> {
+  if (cachedSystemPromptTemplate !== null) return;
+  try {
+    const resp = await fetch('assets/system-prompt.md');
+    cachedSystemPromptTemplate = resp.ok ? await resp.text() : '';
+  } catch {
+    cachedSystemPromptTemplate = '';
+  }
+}
+
 async function getSystemPrompt(full: boolean): Promise<string> {
   if (!full) return injectPromptVariables(MINIMAL_PROMPT);
   if (cachedSystemPromptTemplate === null) {
-    try {
-      const resp = await fetch('assets/system-prompt.md');
-      cachedSystemPromptTemplate = resp.ok ? await resp.text() : '';
-    } catch {
-      cachedSystemPromptTemplate = '';
-    }
+    await preloadSystemPrompt();
   }
-  return injectPromptVariables(cachedSystemPromptTemplate);
+  return injectPromptVariables(cachedSystemPromptTemplate!);
 }
 
 interface ResponseOutputItem {
@@ -242,39 +257,66 @@ export async function generateImage({
   }
 
   let response: Response;
-  try {
-    const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, timeoutSignal])
-      : timeoutSignal;
+  let lastError: Error | null = null;
+  const maxAttempts = onStream ? 1 : MAX_RETRIES + 1;
 
-    response = await fetch(`${config.baseURL.replace(/\/+$/, '')}/responses`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal: combinedSignal,
-    });
-  } catch (err) {
-    const apiUrl = `${config.baseURL.replace(/\/+$/, '')}/responses`;
-    throw await classifyFetchError(err, apiUrl);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try {
-      detail = JSON.parse(text).error?.message || text;
-    } catch {
-      // keep raw text
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+      await sleep(delay);
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     }
-    throw classifyHttpError(response.status, detail);
+
+    try {
+      const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const combinedSignal = signal
+        ? AbortSignal.any([signal, timeoutSignal])
+        : timeoutSignal;
+
+      response = await fetch(`${config.baseURL.replace(/\/+$/, '')}/responses`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: combinedSignal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw err;
+      }
+      if (attempt < maxAttempts - 1) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        continue;
+      }
+      const apiUrl = `${config.baseURL.replace(/\/+$/, '')}/responses`;
+      throw await classifyFetchError(err, apiUrl);
+    }
+
+    if (!response!.ok) {
+      if (isRetryableStatus(response!.status) && attempt < maxAttempts - 1) {
+        lastError = classifyHttpError(response!.status, '');
+        continue;
+      }
+      const text = await response!.text();
+      let detail = text;
+      try {
+        detail = JSON.parse(text).error?.message || text;
+      } catch {
+        // keep raw text
+      }
+      throw classifyHttpError(response!.status, detail);
+    }
+
+    lastError = null;
+    break;
   }
+
+  if (lastError) throw lastError;
 
   if (!onStream) {
-    const data = await response.json();
+    const data = await response!.json();
     const result = parseResponseOutput(data.output);
     if (!result.text && !result.imageBase64) {
       throw new Error('The API returned an empty response — the model may not support this request, or content was filtered.');
@@ -282,11 +324,11 @@ export async function generateImage({
     return { ...result, raw: data };
   }
 
-  if (!response.body) {
+  if (!response!.body) {
     throw new Error('Streaming not supported: missing response body');
   }
 
-  const reader = response.body.getReader();
+  const reader = response!.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let accText: string | null = null;

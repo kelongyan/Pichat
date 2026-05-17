@@ -4,6 +4,7 @@ import { ToastProvider } from './components/Toast';
 import { LightboxProvider } from './components/Lightbox';
 import { useConfigStore, initStore } from './lib/store';
 import { useThemeStore } from './lib/theme';
+import { preloadSystemPrompt } from './lib/api';
 import Landing from './pages/Landing';
 import Chat from './pages/Chat';
 import Gallery from './pages/Gallery';
@@ -43,6 +44,7 @@ export function App() {
       loadConfig();
       applyTheme();
     });
+    preloadSystemPrompt();
   }, []);
 
   return (
