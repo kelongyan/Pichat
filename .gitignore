@@ -6,3 +6,10 @@ tsconfig.tsbuildinfo
 .superpowers/
 .playwright-mcp/
 screenshots/
+
+# AI assistant docs
+CLAUDE.md
+CODEBUDDY.md
+
+# IDE / local settings
+.claude/

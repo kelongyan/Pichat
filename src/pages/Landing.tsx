@@ -85,7 +85,7 @@ export default function Landing() {
     <>
       <Header activeTab="create" />
       <div className="landing fade-in">
-        <img src="assets/logo.png" alt="GPT2IMAGE" className="landing-logo" />
+        <img src="assets/OpenAI.png" alt="GPT2IMAGE" className="landing-logo" />
         <h1 className="landing-title">What would you like to create?</h1>
         <p className="landing-subtitle">Describe any image and bring it to life</p>
         <div className="landing-input">

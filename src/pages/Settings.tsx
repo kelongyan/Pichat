@@ -94,7 +94,7 @@ function ConnectView() {
       <div className="view-centered fade-in">
         <div className="settings-view" style={{ width: '100%', padding: '0 20px' }}>
           <img
-            src="assets/icon.png"
+            src="assets/OpenAI.png"
             alt="GPT2IMAGE"
             style={{
               width: 60,
