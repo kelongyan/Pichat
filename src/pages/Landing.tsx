@@ -37,19 +37,18 @@ function RecentThumb({ img, onClick }: { img: GalleryImage; onClick: () => void 
 export default function Landing() {
   const navigate = useNavigate();
   const { open: openLightbox } = useLightbox();
-  const getAllImages = useConversationStore((s) => s.getAllImages);
+  const getRecentImages = useConversationStore((s) => s.getRecentImages);
 
   const inputRef = useRef<InputBarHandle>(null);
   const [recentImages, setRecentImages] = useState<GalleryImage[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    getAllImages().then((all) => {
-      if (cancelled) return;
-      setRecentImages(all.slice(0, 6));
+    getRecentImages(6).then((imgs) => {
+      if (!cancelled) setRecentImages(imgs);
     });
     return () => { cancelled = true; };
-  }, [getAllImages]);
+  }, [getRecentImages]);
 
   function handleSend(data: SendData) {
     navigate('/chat', {

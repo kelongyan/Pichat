@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Pencil, Maximize2 } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
-import { getImageURL, getThumbURL, getImageBase64 } from '../lib/imageStore';
+import { getImageURL, getThumbURL, getImageBlob } from '../lib/imageStore';
 
 interface ImageCardProps {
   imageBase64?: string;
@@ -40,12 +40,14 @@ export function ImageCard({
   function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
     if (imageId) {
-      getImageBase64(imageId).then((b64) => {
-        if (!b64) return;
+      getImageBlob(imageId).then((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = `data:image/png;base64,${b64}`;
+        a.href = url;
         a.download = buildImageFilename(prompt, timestamp);
         a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
     } else {
       const a = document.createElement('a');

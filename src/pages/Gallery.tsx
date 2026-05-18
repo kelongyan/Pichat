@@ -6,7 +6,7 @@ import { ImageCard } from '../components/ImageCard';
 import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { useConversationStore } from '../lib/store';
-import { getImageURL } from '../lib/imageStore';
+import { getImageURL, revokeAll } from '../lib/imageStore';
 import type { GalleryImage } from '../types';
 
 const PAGE_SIZE = 20;
@@ -15,33 +15,55 @@ export default function Gallery() {
   const navigate = useNavigate();
   const { open: openLightbox } = useLightbox();
   const { show: showToast } = useToast();
-  const getAllImages = useConversationStore((s) => s.getAllImages);
+  const getImagePage = useConversationStore((s) => s.getImagePage);
 
-  const [allImages, setAllImages] = useState<GalleryImage[] | null>(null);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const cursorRef = useRef<string | null>(null);
+  const loadingRef = useRef(false);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getAllImages().then((list) => {
-      if (!cancelled) setAllImages(list);
+    getImagePage(null, PAGE_SIZE).then(({ images: page, nextCursor }) => {
+      if (cancelled) return;
+      cursorRef.current = nextCursor;
+      setImages(page);
+      setHasMore(nextCursor !== null);
+      setLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [getAllImages]);
+  }, [getImagePage]);
 
   useEffect(() => {
-    if (!loadTriggerRef.current || !allImages) return;
+    return () => { revokeAll(); };
+  }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMore) return;
+    loadingRef.current = true;
+    try {
+      const { images: page, nextCursor } = await getImagePage(cursorRef.current, PAGE_SIZE);
+      cursorRef.current = nextCursor;
+      setImages((prev) => [...prev, ...page]);
+      setHasMore(nextCursor !== null);
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [getImagePage, hasMore]);
+
+  useEffect(() => {
+    if (!loadTriggerRef.current) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, allImages.length));
-        }
+        if (entries[0].isIntersecting) loadMore();
       },
       { threshold: 0.1 },
     );
     observer.observe(loadTriggerRef.current);
     return () => observer.disconnect();
-  }, [allImages]);
+  }, [loadMore, images.length]);
 
   const handleEdit = useCallback((src: string) => {
     navigate('/chat', { state: { images: [src] } });
@@ -58,12 +80,10 @@ export default function Gallery() {
     }
   }, [openLightbox]);
 
-  const images = allImages ? allImages.slice(0, visibleCount) : null;
-
   return (
     <>
       <Header activeTab="gallery" />
-      {allImages !== null && allImages.length === 0 && (
+      {loaded && images.length === 0 && (
         <div className="landing fade-in">
           <div style={{ color: 'var(--text-muted)', fontSize: 48, marginBottom: 16 }}>
             <ImageIcon size={48} strokeWidth={1} />
@@ -74,7 +94,7 @@ export default function Gallery() {
           </p>
         </div>
       )}
-      {images && images.length > 0 && (
+      {images.length > 0 && (
         <div className="gallery-grid fade-in">
           {images.map((img, i) => (
             <ImageCard
@@ -89,7 +109,7 @@ export default function Gallery() {
               onFullscreen={() => handleFullscreen(img)}
             />
           ))}
-          {allImages && visibleCount < allImages.length && (
+          {hasMore && (
             <div ref={loadTriggerRef} style={{ height: 1 }} />
           )}
         </div>

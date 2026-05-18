@@ -99,6 +99,35 @@ async function migrateImagesToBlobs() {
   }
 }
 
+function extractConversationImages(conv: Conversation): GalleryImage[] {
+  const images: GalleryImage[] = [];
+  for (let i = 0; i < conv.messages.length; i++) {
+    const msg = conv.messages[i];
+    if (msg.role !== 'assistant') continue;
+    let prompt = '';
+    for (let j = i - 1; j >= 0; j--) {
+      if (conv.messages[j].role === 'user') { prompt = conv.messages[j].text || ''; break; }
+    }
+    const variants = msg.variants
+      || (msg.variants === undefined && msg.imageBase64
+        ? [{ imageBase64: msg.imageBase64, size: msg.size || 'auto', timestamp: msg.timestamp }]
+        : []);
+    for (const v of variants) {
+      if (v.imageId || v.imageBase64) {
+        images.push({
+          imageId: v.imageId,
+          imageBase64: v.imageId ? undefined : v.imageBase64,
+          size: v.size || 'auto',
+          prompt,
+          conversationId: conv.id,
+          timestamp: v.timestamp || msg.timestamp,
+        });
+      }
+    }
+  }
+  return images;
+}
+
 export async function initStore() {
   await openDB();
   await migrateFromLocalStorage();
@@ -153,6 +182,8 @@ interface ConversationState {
   save: (conversation: Conversation) => Promise<void>;
   remove: (id: string) => Promise<void>;
   getAllImages: () => Promise<GalleryImage[]>;
+  getRecentImages: (limit: number) => Promise<GalleryImage[]>;
+  getImagePage: (cursor: string | null, pageSize: number) => Promise<{ images: GalleryImage[]; nextCursor: string | null }>;
 }
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
@@ -222,38 +253,58 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       request.onerror = () => reject(request.error);
     });
     const images: GalleryImage[] = [];
-    for (const conv of convs) {
-      for (let i = 0; i < conv.messages.length; i++) {
-        const msg = conv.messages[i];
-        if (msg.role !== 'assistant') continue;
-
-        let prompt = '';
-        for (let j = i - 1; j >= 0; j--) {
-          if (conv.messages[j].role === 'user') {
-            prompt = conv.messages[j].text || '';
-            break;
-          }
-        }
-
-        const variants = msg.variants
-          || (msg.variants === undefined && msg.imageBase64
-            ? [{ imageBase64: msg.imageBase64, size: msg.size || 'auto', timestamp: msg.timestamp }]
-            : []);
-
-        for (const v of variants) {
-          if (v.imageId || v.imageBase64) {
-            images.push({
-              imageId: v.imageId,
-              imageBase64: v.imageId ? undefined : v.imageBase64,
-              size: v.size || 'auto',
-              prompt,
-              conversationId: conv.id,
-              timestamp: v.timestamp || msg.timestamp,
-            });
-          }
-        }
-      }
-    }
+    for (const conv of convs) images.push(...extractConversationImages(conv));
     return images.sort((a, b) => b.timestamp - a.timestamp);
+  },
+  getRecentImages: async (limit: number) => {
+    if (!db || limit <= 0) return [];
+    const images: GalleryImage[] = [];
+    return new Promise((resolve, reject) => {
+      const tx = db!.transaction(CONV_STORE, 'readonly');
+      const store = tx.objectStore(CONV_STORE);
+      const request = store.openCursor(null, 'prev');
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor || images.length >= limit) {
+          resolve(images.sort((a, b) => b.timestamp - a.timestamp));
+          return;
+        }
+        images.push(...extractConversationImages(cursor.value));
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  },
+  getImagePage: async (cursor: string | null, pageSize: number) => {
+    if (!db || pageSize <= 0) return { images: [], nextCursor: null };
+    let foundCursor = !cursor;
+    let lastId: string | null = null;
+
+    return new Promise<{ images: GalleryImage[]; nextCursor: string | null }>((resolve, reject) => {
+      const collected: GalleryImage[] = [];
+      const tx = db!.transaction(CONV_STORE, 'readonly');
+      const store = tx.objectStore(CONV_STORE);
+      const request = store.openCursor(null, 'prev');
+      request.onsuccess = () => {
+        const c = request.result;
+        if (!c) {
+          resolve({ images: collected, nextCursor: lastId });
+          return;
+        }
+        if (!foundCursor) {
+          if (c.value.id === cursor) foundCursor = true;
+          c.continue();
+          return;
+        }
+        collected.push(...extractConversationImages(c.value));
+        lastId = c.value.id;
+        if (collected.length >= pageSize) {
+          resolve({ images: collected.slice(0, pageSize), nextCursor: lastId });
+          return;
+        }
+        c.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
   },
 }));

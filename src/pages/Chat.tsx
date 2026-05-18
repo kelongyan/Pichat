@@ -199,6 +199,7 @@ export default function Chat() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const autoSentRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const handleSendRef = useRef<(d: SendData) => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
@@ -224,7 +225,7 @@ export default function Chat() {
     }
     if (state.autoSend && state.prompt && !autoSentRef.current) {
       autoSentRef.current = true;
-      handleSend({
+      handleSendRef.current({
         prompt: state.prompt,
         size: state.size || 'auto',
         thinking: state.thinking || 'low',
@@ -318,6 +319,8 @@ export default function Chat() {
     }
   }
 
+  handleSendRef.current = handleSend;
+
   async function handleRetry(msgIdx: number) {
     if (isGenerating || !conversation) return;
     const msg = conversation.messages[msgIdx];
@@ -397,7 +400,7 @@ export default function Chat() {
     }
   }
 
-  async function handleVariantChange(msgIdx: number, direction: -1 | 1) {
+  function handleVariantChange(msgIdx: number, direction: -1 | 1) {
     if (!conversation) return;
     const updatedConv = { ...conversation };
     updatedConv.messages = [...updatedConv.messages];
@@ -407,7 +410,6 @@ export default function Chat() {
     msg.activeVariant = Math.max(0, Math.min(variants.length - 1, current + direction));
     updatedConv.messages[msgIdx] = msg;
     setConversation(updatedConv);
-    await convStore.save(updatedConv);
   }
 
   const handleEdit = useCallback((src: string) => {

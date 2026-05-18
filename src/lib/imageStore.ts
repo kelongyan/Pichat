@@ -124,6 +124,18 @@ export async function getImageBase64(id: string): Promise<string> {
   return blobToBase64(record.blob);
 }
 
+export async function getImageBlob(id: string): Promise<Blob | null> {
+  if (!db) return null;
+  const tx = db.transaction(IMAGES_STORE, 'readonly');
+  const store = tx.objectStore(IMAGES_STORE);
+  const request = store.get(id);
+  const record = await new Promise<{ blob: Blob } | undefined>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return record?.blob ?? null;
+}
+
 export async function deleteImage(id: string): Promise<void> {
   if (!db) return;
   const tx = db.transaction(IMAGES_STORE, 'readwrite');
@@ -151,26 +163,29 @@ export function revokeAll() {
 }
 
 export async function compressImage(dataUrl: string, maxEdge = 2048, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width <= maxEdge && height <= maxEdge) {
-        resolve(dataUrl);
-        return;
-      }
-      const scale = Math.min(maxEdge / width, maxEdge / height);
-      width = Math.round(width * scale);
-      height = Math.round(height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => reject(new Error('Failed to load image for compression'));
-    img.src = dataUrl;
+  const blob = await (await fetch(dataUrl)).blob();
+  const bitmap = await createImageBitmap(blob);
+  const { width, height } = bitmap;
+
+  if (width <= maxEdge && height <= maxEdge) {
+    bitmap.close();
+    return dataUrl;
+  }
+
+  const scale = Math.min(maxEdge / width, maxEdge / height);
+  const tw = Math.round(width * scale);
+  const th = Math.round(height * scale);
+
+  const canvas = new OffscreenCanvas(tw, th);
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0, tw, th);
+  bitmap.close();
+
+  const resultBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  return new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(resultBlob);
   });
 }
 

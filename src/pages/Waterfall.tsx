@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast';
 import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
 import { useConversationStore, generateId } from '../lib/store';
-import { saveImage, getImageURL, getImageBase64 } from '../lib/imageStore';
+import { saveImage, getImageURL, getImageBlob, revokeAll } from '../lib/imageStore';
 import { buildImageFilename } from '../lib/filename';
 import { ChevronDown, Download, Save, Maximize2, RefreshCw } from 'lucide-react';
 
@@ -53,7 +53,9 @@ export default function Waterfall() {
   const [currentSize, setCurrentSize] = useState('auto');
   const [currentThinking, setCurrentThinking] = useState('');
   const [isActive, setIsActive] = useState(false);
-  const [cards, setCards] = useState<WaterfallCard[]>([]);
+  const cardMapRef = useRef(new Map<string, WaterfallCard>());
+  const [cardVersion, setCardVersion] = useState(0);
+  const cards = Array.from(cardMapRef.current.values());
   const [tierOpen, setTierOpen] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -101,7 +103,67 @@ export default function Waterfall() {
         ctrl.abort();
       }
       abortControllersRef.current = [];
+      revokeAll();
     };
+  }, []);
+
+  const requestCard = useCallback((cardId: string) => {
+    activeRequestsRef.current++;
+    const controller = new AbortController();
+    abortControllersRef.current.push(controller);
+
+    generateImage({
+      prompt: currentPromptRef.current,
+      size: currentSizeRef.current,
+      thinking: currentThinkingRef.current,
+      images: currentImagesRef.current,
+      signal: controller.signal,
+      onStream: (delta) => {
+        const card = cardMapRef.current.get(cardId);
+        if (!card || delta.imageBase64) return;
+        if (delta.text && card.state === 'loading') {
+          cardMapRef.current.set(cardId, { ...card, state: 'text', streamText: delta.text, aspectRatio: '' });
+          setCardVersion((v) => v + 1);
+        } else if (delta.text && card.state === 'text') {
+          card.streamText = delta.text;
+          setCardVersion((v) => v + 1);
+        }
+      },
+    })
+      .then(async (result) => {
+        if (result.imageBase64) {
+          const imageId = await saveImage(result.imageBase64);
+          const imageUrl = await getImageURL(imageId);
+          const card = cardMapRef.current.get(cardId);
+          if (card) {
+            cardMapRef.current.set(cardId, { ...card, state: 'image', imageId, imageUrl, imageBase64: result.imageBase64!, aspectRatio: '' });
+            setCardVersion((v) => v + 1);
+          }
+        } else if (result.text) {
+          const card = cardMapRef.current.get(cardId);
+          if (card) {
+            cardMapRef.current.set(cardId, { ...card, state: 'text', text: result.text!, aspectRatio: '' });
+            setCardVersion((v) => v + 1);
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') {
+          cardMapRef.current.delete(cardId);
+          setCardVersion((v) => v + 1);
+        } else {
+          const card = cardMapRef.current.get(cardId);
+          if (card) {
+            cardMapRef.current.set(cardId, { ...card, state: 'error', errorMessage: err.message, aspectRatio: '' });
+            setCardVersion((v) => v + 1);
+          }
+        }
+      })
+      .finally(() => {
+        activeRequestsRef.current--;
+        const idx = abortControllersRef.current.indexOf(controller);
+        if (idx >= 0) abortControllersRef.current.splice(idx, 1);
+      });
   }, []);
 
   const triggerBatch = useCallback(async () => {
@@ -126,74 +188,14 @@ export default function Waterfall() {
     }
     sessionCountRef.current += batchSize;
 
-    const newCards: WaterfallCard[] = [];
     for (let i = 0; i < batchSize; i++) {
       const ratio = ASPECT_RATIOS[Math.floor(Math.random() * ASPECT_RATIOS.length)];
-      newCards.push({
-        id: generateId(),
-        state: 'loading',
-        aspectRatio: ratio,
-      });
+      const id = generateId();
+      cardMapRef.current.set(id, { id, state: 'loading', aspectRatio: ratio });
+      requestCard(id);
     }
-    setCards((prev) => [...prev, ...newCards]);
-
-    for (const card of newCards) {
-      activeRequestsRef.current++;
-      const controller = new AbortController();
-      abortControllersRef.current.push(controller);
-
-      generateImage({
-        prompt,
-        size: currentSizeRef.current,
-        thinking: currentThinkingRef.current,
-        images: currentImagesRef.current,
-        signal: controller.signal,
-        onStream: (delta) => {
-          setCards((prev) => prev.map((c) => {
-            if (c.id !== card.id) return c;
-            if (delta.imageBase64) return c;
-            if (delta.text && c.state === 'loading') {
-              return { ...c, state: 'text' as const, streamText: delta.text, aspectRatio: '' };
-            }
-            if (delta.text && c.state === 'text') {
-              return { ...c, streamText: delta.text };
-            }
-            return c;
-          }));
-        },
-      })
-        .then(async (result) => {
-          if (result.imageBase64) {
-            const imageId = await saveImage(result.imageBase64);
-            const imageUrl = await getImageURL(imageId);
-            setCards((prev) => prev.map((c) => {
-              if (c.id !== card.id) return c;
-              return { ...c, state: 'image', imageId, imageUrl, imageBase64: result.imageBase64!, aspectRatio: '' };
-            }));
-          } else if (result.text) {
-            setCards((prev) => prev.map((c) => {
-              if (c.id !== card.id) return c;
-              return { ...c, state: 'text', text: result.text!, aspectRatio: '' };
-            }));
-          }
-        })
-        .catch((err) => {
-          if (err.name === 'AbortError') {
-            setCards((prev) => prev.filter((c) => c.id !== card.id));
-          } else {
-            setCards((prev) => prev.map((c) => {
-              if (c.id !== card.id) return c;
-              return { ...c, state: 'error', errorMessage: err.message, aspectRatio: '' };
-            }));
-          }
-        })
-        .finally(() => {
-          activeRequestsRef.current--;
-          const idx = abortControllersRef.current.indexOf(controller);
-          if (idx >= 0) abortControllersRef.current.splice(idx, 1);
-        });
-    }
-  }, []);
+    setCardVersion((v) => v + 1);
+  }, [requestCard]);
 
   useEffect(() => {
     if (!loadTriggerRef.current || !scrollContainerRef.current) return;
@@ -251,61 +253,11 @@ export default function Waterfall() {
   }
 
   function handleRetryCard(cardId: string) {
-    setCards((prev) => prev.map((c) => {
-      if (c.id !== cardId) return c;
-      return { ...c, state: 'loading' as const, errorMessage: undefined, aspectRatio: '1/1' };
-    }));
-    activeRequestsRef.current++;
-    const controller = new AbortController();
-    abortControllersRef.current.push(controller);
-
-    generateImage({
-      prompt: currentPromptRef.current,
-      size: currentSizeRef.current,
-      thinking: currentThinkingRef.current,
-      images: currentImagesRef.current,
-      signal: controller.signal,
-      onStream: (delta) => {
-        setCards((prev) => prev.map((c) => {
-          if (c.id !== cardId) return c;
-          if (delta.text && c.state === 'loading') {
-            return { ...c, state: 'text' as const, streamText: delta.text, aspectRatio: '' };
-          }
-          if (delta.text && c.state === 'text') {
-            return { ...c, streamText: delta.text };
-          }
-          return c;
-        }));
-      },
-    })
-      .then(async (result) => {
-        if (result.imageBase64) {
-          const imageId = await saveImage(result.imageBase64);
-          const imageUrl = await getImageURL(imageId);
-          setCards((prev) => prev.map((c) => {
-            if (c.id !== cardId) return c;
-            return { ...c, state: 'image', imageId, imageUrl, imageBase64: result.imageBase64!, aspectRatio: '' };
-          }));
-        } else if (result.text) {
-          setCards((prev) => prev.map((c) => {
-            if (c.id !== cardId) return c;
-            return { ...c, state: 'text', text: result.text!, aspectRatio: '' };
-          }));
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          setCards((prev) => prev.map((c) => {
-            if (c.id !== cardId) return c;
-            return { ...c, state: 'error', errorMessage: err.message, aspectRatio: '' };
-          }));
-        }
-      })
-      .finally(() => {
-        activeRequestsRef.current--;
-        const idx = abortControllersRef.current.indexOf(controller);
-        if (idx >= 0) abortControllersRef.current.splice(idx, 1);
-      });
+    const card = cardMapRef.current.get(cardId);
+    if (!card) return;
+    cardMapRef.current.set(cardId, { ...card, state: 'loading', errorMessage: undefined, aspectRatio: '1/1' });
+    setCardVersion((v) => v + 1);
+    requestCard(cardId);
   }
 
   return (
@@ -409,7 +361,11 @@ export default function Waterfall() {
                             e.stopPropagation();
                             if (card.imageId) {
                               saveToGallery(card.imageId, currentPrompt);
-                              setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, saved: true } : c));
+                              const c = cardMapRef.current.get(card.id);
+                              if (c) {
+                                cardMapRef.current.set(card.id, { ...c, saved: true });
+                                setCardVersion((v) => v + 1);
+                              }
                             }
                           }}
                         >
@@ -421,12 +377,14 @@ export default function Waterfall() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (card.imageId) {
-                              getImageBase64(card.imageId).then((b64) => {
-                                if (!b64) return;
+                              getImageBlob(card.imageId).then((blob) => {
+                                if (!blob) return;
+                                const url = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
-                                a.href = `data:image/png;base64,${b64}`;
+                                a.href = url;
                                 a.download = buildImageFilename(currentPrompt);
                                 a.click();
+                                setTimeout(() => URL.revokeObjectURL(url), 1000);
                               });
                             } else if (card.imageBase64) {
                               const a = document.createElement('a');
