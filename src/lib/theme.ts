@@ -20,7 +20,7 @@ function animateThemeFromPoint(dark: boolean, x: number, y: number) {
   const maxY = Math.max(y, window.innerHeight - y);
   const maxRadius = Math.ceil(Math.sqrt(maxX * maxX + maxY * maxY));
 
-  const oldBg = dark ? '#ffffff' : '#1a1a1a';
+  const oldBg = dark ? '#fafafa' : '#111111';
   const overlay = document.createElement('div');
   overlay.style.cssText = `position:fixed;inset:0;z-index:99999;pointer-events:none;background:${oldBg};clip-path:circle(${maxRadius}px at ${x}px ${y}px);`;
   document.body.appendChild(overlay);

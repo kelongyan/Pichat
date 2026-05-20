@@ -29,7 +29,7 @@ async function classifyFetchError(err: unknown, url?: string): Promise<Error> {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes('CORS') || msg.includes('blocked')) {
     return new Error(
-      'CORS error: The API server does not allow browser requests. This API provider may only support server-side or desktop clients (e.g. Cherry Studio). Try a different API provider, or deploy GPT2IMAGE behind a reverse proxy.'
+      'CORS error: The API server does not allow browser requests. This API provider may only support server-side or desktop clients (e.g. Cherry Studio). Try a different API provider, or deploy Pichat behind a reverse proxy.'
     );
   }
   if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('ERR_')) {
@@ -81,14 +81,14 @@ function injectPromptVariables(template: string): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`);
 }
 
-const MINIMAL_PROMPT = `You are GPT-2-IMAGE, an AI assistant with conversational and image generation capabilities.
+const MINIMAL_PROMPT = `You are Pichat, an AI assistant with conversational and image generation capabilities.
 
 The current date is {{CURRENT_DATE}}.
 
 # Platform
 
  - Model ID: \`gpt-2-image\`
- - Platform: app.gpt2image.org
+ - Platform: Pichat
  - Developed by: MoYeRanQianZhi
  - Knowledge cutoff: 2025-08
  - Context window: 1M`;

@@ -69,19 +69,19 @@ function StreamBubble({ streamRef, showThinking }: { streamRef: React.RefObject<
             <MarkdownRenderer content={state.text} />
           </div>
         )}
-        {state.imageBase64 && (
-          <img
-            src={`data:image/png;base64,${state.imageBase64}`}
-            alt=""
-            style={{ maxWidth: 280, borderRadius: 'var(--radius-lg)', display: 'block', marginTop: 10 }}
-          />
-        )}
         {!state.text && !state.imageBase64 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)', fontSize: 16 }}>
             <span className="loading-dot" /> Generating...
           </div>
         )}
       </div>
+      {state.imageBase64 && (
+        <img
+          src={`data:image/png;base64,${state.imageBase64}`}
+          alt=""
+          className="stream-image"
+        />
+      )}
     </div>
   );
 }
@@ -114,18 +114,20 @@ const MessageBubble = memo(function MessageBubble({
       {msg.error ? (
         <div className="bubble-ai bubble-ai-error">{msg.error}</div>
       ) : variant ? (
-        <div className="bubble-ai">
-          {showThinking && variant.thinking && (
-            <details className="thinking-block">
-              <summary className="thinking-summary">Thinking</summary>
-              <div className="thinking-content">{variant.thinking}</div>
-            </details>
-          )}
-          {variant.text && (
-            <div className="bubble-ai-text markdown-body" style={variant.imageBase64 || variant.imageId ? { marginBottom: 10 } : undefined}>
-              <MarkdownRenderer content={variant.text} />
-            </div>
-          )}
+        <>
+          <div className="bubble-ai">
+            {showThinking && variant.thinking && (
+              <details className="thinking-block">
+                <summary className="thinking-summary">Thinking</summary>
+                <div className="thinking-content">{variant.thinking}</div>
+              </details>
+            )}
+            {variant.text && (
+              <div className="bubble-ai-text markdown-body">
+                <MarkdownRenderer content={variant.text} />
+              </div>
+            )}
+          </div>
           {(variant.imageId || variant.imageBase64) && (
             <ImageCard
               imageId={variant.imageId}
@@ -137,7 +139,7 @@ const MessageBubble = memo(function MessageBubble({
               onFullscreen={(src) => onFullscreen(src, '')}
             />
           )}
-        </div>
+        </>
       ) : null}
 
       <div className="message-actions">
@@ -476,7 +478,7 @@ export default function Chat() {
         )}
       </div>
 
-      <div style={{ padding: '0 24px 16px' }}>
+      <div style={{ padding: '0 24px 16px', maxWidth: 900, width: '100%', margin: '0 auto' }}>
         <InputBar
           ref={inputRef}
           placeholder="Continue creating..."

@@ -1,4 +1,4 @@
-# GPT2IMAGE Design System
+# Pichat Design System
 
 > **Palette**: Minimalist black & white (GPT-style). Primary text `#1a1a1a`, backgrounds `#ffffff` / `#f7f7f8`, accent `#1a1a1a`. No colored brand accents — monochrome only.
 >

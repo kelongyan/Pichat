@@ -95,7 +95,7 @@ function ConnectView() {
         <div className="settings-view" style={{ width: '100%', padding: '0 20px' }}>
           <img
             src="assets/OpenAI.png"
-            alt="GPT2IMAGE"
+            alt="Pichat"
             style={{
               width: 60,
               height: 60,
@@ -103,7 +103,7 @@ function ConnectView() {
               marginBottom: 30,
             }}
           />
-          <h2 className="settings-title">Configure GPT2IMAGE</h2>
+          <h2 className="settings-title">Configure Pichat</h2>
           <p className="settings-subtitle">
             Connect to an OpenAI-compatible API endpoint
           </p>
