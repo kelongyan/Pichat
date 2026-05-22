@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Pencil, Maximize2 } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
-import { getImageURL, getThumbURL, getImageBlob } from '../lib/imageStore';
+import { getImageURL, getThumbURL, getImageBlob, getImageBase64 } from '../lib/imageStore';
 
 interface ImageCardProps {
   imageBase64?: string;
@@ -59,8 +59,17 @@ export function ImageCard({
 
   function handleEdit(e: React.MouseEvent) {
     e.stopPropagation();
-    const editSrc = fullSrc || src;
-    onEdit?.(editSrc);
+    if (imageId) {
+      getImageBase64(imageId).then((base64) => {
+        if (base64) {
+          onEdit?.(`data:image/png;base64,${base64}`);
+        } else {
+          onEdit?.(fullSrc || src);
+        }
+      });
+    } else {
+      onEdit?.(src);
+    }
   }
 
   function handleFullscreen(e: React.MouseEvent) {
