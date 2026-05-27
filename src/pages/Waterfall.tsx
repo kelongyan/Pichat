@@ -27,6 +27,8 @@ const SUGGESTIONS = [
 ];
 
 const ASPECT_RATIOS = ['1/1', '3/4', '4/3', '2/3'];
+const MAX_CONCURRENT_REQUESTS = 4;
+const MAX_PENDING_BATCHES = 2;
 
 interface WaterfallCard {
   id: string;
@@ -67,6 +69,8 @@ export default function Waterfall() {
   const warningBlockRef = useRef(false);
 
   const activeRequestsRef = useRef(0);
+  const queuedCardIdsRef = useRef<string[]>([]);
+  const drainQueueRef = useRef<() => void>(() => {});
   const sessionCountRef = useRef(0);
   const milestoneShownRef = useRef(new Set<number>());
   const abortControllersRef = useRef<AbortController[]>([]);
@@ -103,6 +107,7 @@ export default function Waterfall() {
         ctrl.abort();
       }
       abortControllersRef.current = [];
+      queuedCardIdsRef.current = [];
       revokeAll();
     };
   }, []);
@@ -163,16 +168,37 @@ export default function Waterfall() {
         activeRequestsRef.current--;
         const idx = abortControllersRef.current.indexOf(controller);
         if (idx >= 0) abortControllersRef.current.splice(idx, 1);
+        drainQueueRef.current();
       });
   }, []);
+
+  const drainQueue = useCallback(() => {
+    while (
+      activeRequestsRef.current < MAX_CONCURRENT_REQUESTS
+      && queuedCardIdsRef.current.length > 0
+    ) {
+      const nextId = queuedCardIdsRef.current.shift();
+      if (nextId) requestCard(nextId);
+    }
+  }, [requestCard]);
+
+  useEffect(() => {
+    drainQueueRef.current = drainQueue;
+  }, [drainQueue]);
+
+  const enqueueCard = useCallback((cardId: string) => {
+    queuedCardIdsRef.current.push(cardId);
+    drainQueue();
+  }, [drainQueue]);
 
   const triggerBatch = useCallback(async () => {
     const prompt = currentPromptRef.current;
     if (!prompt || warningBlockRef.current) return;
 
     const tier = currentTierRef.current;
-    const maxConcurrent = tier * 3;
-    const batchSize = Math.min(tier, maxConcurrent - activeRequestsRef.current);
+    const maxPending = Math.max(tier, MAX_CONCURRENT_REQUESTS) * MAX_PENDING_BATCHES;
+    const pendingCount = activeRequestsRef.current + queuedCardIdsRef.current.length;
+    const batchSize = Math.min(tier, maxPending - pendingCount);
     if (batchSize <= 0) return;
 
     const nextCount = sessionCountRef.current + batchSize;
@@ -192,10 +218,10 @@ export default function Waterfall() {
       const ratio = ASPECT_RATIOS[Math.floor(Math.random() * ASPECT_RATIOS.length)];
       const id = generateId();
       cardMapRef.current.set(id, { id, state: 'loading', aspectRatio: ratio });
-      requestCard(id);
+      enqueueCard(id);
     }
     setCardVersion((v) => v + 1);
-  }, [requestCard]);
+  }, [enqueueCard]);
 
   useEffect(() => {
     if (!loadTriggerRef.current || !scrollContainerRef.current) return;
@@ -203,7 +229,8 @@ export default function Waterfall() {
       (entries) => {
         if (!entries[0].isIntersecting) return;
         if (!currentPromptRef.current || loadingMoreRef.current) return;
-        if (activeRequestsRef.current >= currentTierRef.current * 3) return;
+        const maxPending = Math.max(currentTierRef.current, MAX_CONCURRENT_REQUESTS) * MAX_PENDING_BATCHES;
+        if (activeRequestsRef.current + queuedCardIdsRef.current.length >= maxPending) return;
         loadingMoreRef.current = true;
         setLoadingMore(true);
         triggerBatch().finally(() => {
@@ -257,7 +284,7 @@ export default function Waterfall() {
     if (!card) return;
     cardMapRef.current.set(cardId, { ...card, state: 'loading', errorMessage: undefined, aspectRatio: '1/1' });
     setCardVersion((v) => v + 1);
-    requestCard(cardId);
+    enqueueCard(cardId);
   }
 
   return (
@@ -309,6 +336,7 @@ export default function Waterfall() {
 
         {!isActive && (
           <div className="waterfall-landing">
+            <img src="assets/OpenAI.png" alt="Pichat" className="landing-logo" />
             <h1 className="landing-title">What world will you flood with art?</h1>
             <p className="landing-subtitle">One prompt, endless creations</p>
             <div className="landing-input">

@@ -1,14 +1,19 @@
 import { create } from 'zustand';
 import type { Config, Conversation, GalleryImage } from '../types';
-import { setDB, saveImage, IMAGES_STORE } from './imageStore';
+import { setDB, saveImage, deleteImage, IMAGES_STORE } from './imageStore';
 
 const CONFIG_KEY = 'gpt2image_config';
 const DB_NAME = 'gpt2image';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const CONV_STORE = 'conversations';
+const GALLERY_STORE = 'gallery_images';
 const LEGACY_KEY = 'gpt2image_conversations';
 
 let db: IDBDatabase | null = null;
+
+interface GalleryIndexRecord extends GalleryImage {
+  id: string;
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -20,6 +25,11 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!database.objectStoreNames.contains(IMAGES_STORE)) {
         database.createObjectStore(IMAGES_STORE, { keyPath: 'id' });
+      }
+      if (!database.objectStoreNames.contains(GALLERY_STORE)) {
+        const galleryStore = database.createObjectStore(GALLERY_STORE, { keyPath: 'id' });
+        galleryStore.createIndex('timestamp', 'timestamp');
+        galleryStore.createIndex('conversationId', 'conversationId');
       }
     };
     request.onsuccess = () => {
@@ -128,10 +138,104 @@ function extractConversationImages(conv: Conversation): GalleryImage[] {
   return images;
 }
 
+function toGalleryRecords(conv: Conversation): GalleryIndexRecord[] {
+  return extractConversationImages(conv).map((image, index) => ({
+    ...image,
+    id: image.imageId || `${conv.id}:${image.timestamp}:${index}`,
+  }));
+}
+
+function toGalleryImage(record: GalleryIndexRecord): GalleryImage {
+  const { id: _id, ...image } = record;
+  return image;
+}
+
+function extractImageIds(conv: Conversation): string[] {
+  const ids = new Set<string>();
+  for (const msg of conv.messages) {
+    if (msg.role !== 'assistant') continue;
+    if (msg.imageBase64) continue;
+    for (const variant of msg.variants || []) {
+      if (variant.imageId) ids.add(variant.imageId);
+    }
+  }
+  return Array.from(ids);
+}
+
+function readRequest<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function waitForTx(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function syncGalleryForConversation(conv: Conversation): Promise<void> {
+  if (!db) return;
+  const records = toGalleryRecords(conv);
+  const tx = db.transaction(GALLERY_STORE, 'readwrite');
+  const store = tx.objectStore(GALLERY_STORE);
+  const index = store.index('conversationId');
+  const cursorRequest = index.openCursor(IDBKeyRange.only(conv.id));
+
+  cursorRequest.onsuccess = () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) {
+      for (const record of records) {
+        store.put(record);
+      }
+      return;
+    }
+    cursor.delete();
+    cursor.continue();
+  };
+
+  await waitForTx(tx);
+}
+
+async function deleteGalleryForConversation(conversationId: string): Promise<void> {
+  if (!db) return;
+  const tx = db.transaction(GALLERY_STORE, 'readwrite');
+  const store = tx.objectStore(GALLERY_STORE);
+  const index = store.index('conversationId');
+  const cursorRequest = index.openCursor(IDBKeyRange.only(conversationId));
+
+  cursorRequest.onsuccess = () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) return;
+    cursor.delete();
+    cursor.continue();
+  };
+
+  await waitForTx(tx);
+}
+
+async function ensureGalleryIndexBackfilled(): Promise<void> {
+  if (!db) return;
+  const countTx = db.transaction(GALLERY_STORE, 'readonly');
+  const count = await readRequest(countTx.objectStore(GALLERY_STORE).count());
+  await waitForTx(countTx);
+  if (count > 0) return;
+
+  const convTx = db.transaction(CONV_STORE, 'readonly');
+  const convs = await readRequest<Conversation[]>(convTx.objectStore(CONV_STORE).getAll());
+  await waitForTx(convTx);
+  for (const conv of convs) {
+    await syncGalleryForConversation(conv);
+  }
+}
+
 export async function initStore() {
   await openDB();
   await migrateFromLocalStorage();
   await migrateImagesToBlobs();
+  await ensureGalleryIndexBackfilled();
 }
 
 export function generateId(): string {
@@ -220,6 +324,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+    await syncGalleryForConversation(conversation);
     set((state) => {
       const idx = state.conversations.findIndex((c) => c.id === conversation.id);
       if (idx >= 0) {
@@ -232,6 +337,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   },
   remove: async (id: string) => {
     if (!db) return;
+    const existing = await get().get(id);
+    const imageIds = existing ? extractImageIds(existing) : [];
+
     const tx = db.transaction(CONV_STORE, 'readwrite');
     const store = tx.objectStore(CONV_STORE);
     store.delete(id);
@@ -239,37 +347,35 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+    await deleteGalleryForConversation(id);
+    await Promise.all(imageIds.map((imageId) => deleteImage(imageId)));
     set((state) => ({
       conversations: state.conversations.filter((c) => c.id !== id),
     }));
   },
   getAllImages: async () => {
     if (!db) return [];
-    const tx = db.transaction(CONV_STORE, 'readonly');
-    const store = tx.objectStore(CONV_STORE);
-    const request = store.getAll();
-    const convs = await new Promise<Conversation[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result.sort((a: Conversation, b: Conversation) => b.createdAt - a.createdAt));
-      request.onerror = () => reject(request.error);
-    });
-    const images: GalleryImage[] = [];
-    for (const conv of convs) images.push(...extractConversationImages(conv));
-    return images.sort((a, b) => b.timestamp - a.timestamp);
+    const tx = db.transaction(GALLERY_STORE, 'readonly');
+    const records = await readRequest<GalleryIndexRecord[]>(tx.objectStore(GALLERY_STORE).getAll());
+    await waitForTx(tx);
+    return records
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .map(toGalleryImage);
   },
   getRecentImages: async (limit: number) => {
     if (!db || limit <= 0) return [];
-    const images: GalleryImage[] = [];
     return new Promise((resolve, reject) => {
-      const tx = db!.transaction(CONV_STORE, 'readonly');
-      const store = tx.objectStore(CONV_STORE);
-      const request = store.openCursor(null, 'prev');
+      const images: GalleryImage[] = [];
+      const tx = db!.transaction(GALLERY_STORE, 'readonly');
+      const index = tx.objectStore(GALLERY_STORE).index('timestamp');
+      const request = index.openCursor(null, 'prev');
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor || images.length >= limit) {
-          resolve(images.sort((a, b) => b.timestamp - a.timestamp));
+          resolve(images);
           return;
         }
-        images.push(...extractConversationImages(cursor.value));
+        images.push(toGalleryImage(cursor.value as GalleryIndexRecord));
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -278,28 +384,31 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   getImagePage: async (cursor: string | null, pageSize: number) => {
     if (!db || pageSize <= 0) return { images: [], nextCursor: null };
     let foundCursor = !cursor;
-    let lastId: string | null = null;
 
     return new Promise<{ images: GalleryImage[]; nextCursor: string | null }>((resolve, reject) => {
-      const collected: GalleryImage[] = [];
-      const tx = db!.transaction(CONV_STORE, 'readonly');
-      const store = tx.objectStore(CONV_STORE);
-      const request = store.openCursor(null, 'prev');
+      const collected: GalleryIndexRecord[] = [];
+      const tx = db!.transaction(GALLERY_STORE, 'readonly');
+      const index = tx.objectStore(GALLERY_STORE).index('timestamp');
+      const request = index.openCursor(null, 'prev');
       request.onsuccess = () => {
         const c = request.result;
         if (!c) {
-          resolve({ images: collected, nextCursor: lastId });
+          resolve({ images: collected.map(toGalleryImage), nextCursor: null });
           return;
         }
+        const record = c.value as GalleryIndexRecord;
         if (!foundCursor) {
-          if (c.value.id === cursor) foundCursor = true;
+          if (record.id === cursor) foundCursor = true;
           c.continue();
           return;
         }
-        collected.push(...extractConversationImages(c.value));
-        lastId = c.value.id;
-        if (collected.length >= pageSize) {
-          resolve({ images: collected.slice(0, pageSize), nextCursor: lastId });
+        collected.push(record);
+        if (collected.length > pageSize) {
+          const page = collected.slice(0, pageSize);
+          resolve({
+            images: page.map(toGalleryImage),
+            nextCursor: page[page.length - 1]?.id ?? null,
+          });
           return;
         }
         c.continue();

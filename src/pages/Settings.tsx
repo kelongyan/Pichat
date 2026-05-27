@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
 function GithubIcon({ size = 24 }: { size?: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -11,6 +12,17 @@ import { Header } from '../components/Header';
 import { useToast } from '../components/Toast';
 import { useConfigStore } from '../lib/store';
 import type { Config } from '../types';
+
+const GITHUB_URL = 'https://github.com/kelongyan/Pichat';
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export default function Settings() {
   const config = useConfigStore((s) => s.config);
@@ -42,6 +54,10 @@ function ConnectView() {
       showToast('Please fill in all required fields', { type: 'error' });
       return;
     }
+    if (!isValidHttpUrl(b)) {
+      showToast('Please enter a valid HTTP(S) API Base URL', { type: 'error' });
+      return;
+    }
 
     setConnecting(true);
     try {
@@ -64,17 +80,7 @@ function ConnectView() {
       showToast('Connected successfully');
       navigate('/create');
     } catch {
-      saveConfig({
-        baseURL: b,
-        apiKey: k,
-        model: m,
-        showThinking: false,
-        thinkingLevel: 'low',
-        darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
-        useSystemPrompt: true,
-      });
-      showToast('Saved (could not verify connection)', { type: 'error' });
-      navigate('/create');
+      showToast('Connection failed — settings were not saved', { type: 'error' });
     } finally {
       setConnecting(false);
     }
@@ -83,7 +89,7 @@ function ConnectView() {
   return (
     <>
       <a
-        href="https://github.com/MoYeRanQianZhi/GPT2Image"
+        href={GITHUB_URL}
         target="_blank"
         rel="noopener noreferrer"
         className="settings-github"
@@ -164,6 +170,7 @@ function ConnectView() {
 }
 
 function FullSettings({ config }: { config: Config }) {
+  const navigate = useNavigate();
   const { show: showToast } = useToast();
   const saveConfig = useConfigStore((s) => s.save);
 
@@ -180,6 +187,10 @@ function FullSettings({ config }: { config: Config }) {
 
     if (!b || !k) {
       showToast('Please fill in all required fields', { type: 'error' });
+      return;
+    }
+    if (!isValidHttpUrl(b)) {
+      showToast('Please enter a valid HTTP(S) API Base URL', { type: 'error' });
       return;
     }
 
@@ -199,7 +210,18 @@ function FullSettings({ config }: { config: Config }) {
     <>
       <Header activeTab="" />
       <div className="settings-full fade-in">
-        <h2 className="settings-full-title">Settings</h2>
+        <div className="settings-full-header">
+          <h2 className="settings-full-title">Settings</h2>
+          <button
+            className="settings-close-btn"
+            type="button"
+            title="Close settings"
+            aria-label="Close settings"
+            onClick={() => navigate(-1)}
+          >
+            <X size={20} />
+          </button>
+        </div>
 
         <div className="settings-section">
           <div className="settings-section-title">CONNECTION</div>
@@ -292,7 +314,7 @@ function FullSettings({ config }: { config: Config }) {
 
         <div className="settings-footer">
           <a
-            href="https://github.com/MoYeRanQianZhi/GPT2Image"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="settings-footer-link"

@@ -57,31 +57,40 @@ function StreamBubble({ streamRef, showThinking }: { streamRef: React.RefObject<
 
   return (
     <div className="message message-ai">
-      <div className="bubble-ai">
-        {showThinking && state.thinking && (
-          <details className="thinking-block" open>
-            <summary className="thinking-summary">Thinking</summary>
-            <div className="thinking-content">{state.thinking}</div>
-          </details>
-        )}
-        {state.text && (
-          <div className="bubble-ai-text markdown-body">
-            <MarkdownRenderer content={state.text} />
+      <div className="result-card result-card-stream">
+        <div className="result-card-header">
+          <span className="result-card-kicker">Generating</span>
+          <span className="result-card-status"><span className="loading-dot" /> Working on image</span>
+        </div>
+        {state.imageBase64 ? (
+          <div className="result-image-frame">
+            <img
+              src={`data:image/png;base64,${state.imageBase64}`}
+              alt=""
+              className="stream-image"
+            />
+          </div>
+        ) : (
+          <div className="result-image-skeleton">
+            <div className="result-image-sheen" />
           </div>
         )}
-        {!state.text && !state.imageBase64 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)', fontSize: 16 }}>
-            <span className="loading-dot" /> Generating...
+        {(showThinking && state.thinking) || state.text ? (
+          <div className="result-copy">
+            {showThinking && state.thinking && (
+              <details className="thinking-block" open>
+                <summary className="thinking-summary">Thinking</summary>
+                <div className="thinking-content">{state.thinking}</div>
+              </details>
+            )}
+            {state.text && (
+              <div className="bubble-ai-text markdown-body">
+                <MarkdownRenderer content={state.text} />
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
-      {state.imageBase64 && (
-        <img
-          src={`data:image/png;base64,${state.imageBase64}`}
-          alt=""
-          className="stream-image"
-        />
-      )}
     </div>
   );
 }
@@ -108,69 +117,96 @@ const MessageBubble = memo(function MessageBubble({
 }) {
   const variant = getActiveVariant(msg);
   const variants = getVariants(msg);
+  const hasImage = !!(variant?.imageId || variant?.imageBase64);
+  const hasText = !!variant?.text;
 
   return (
     <div className="message message-ai">
       {msg.error ? (
-        <div className="bubble-ai bubble-ai-error">{msg.error}</div>
+        <div className="result-card result-card-error">
+          <div className="result-card-header">
+            <span className="result-card-kicker">Generation failed</span>
+          </div>
+          <div className="bubble-ai-error">{msg.error}</div>
+          <div className="message-actions">
+            <button
+              className="message-retry"
+              title="Retry generation"
+              disabled={isGenerating}
+              onClick={() => onRetry(index)}
+            >
+              <RefreshCw size={16} />
+              <span>Retry</span>
+            </button>
+          </div>
+        </div>
       ) : variant ? (
-        <>
-          <div className="bubble-ai">
-            {showThinking && variant.thinking && (
-              <details className="thinking-block">
-                <summary className="thinking-summary">Thinking</summary>
-                <div className="thinking-content">{variant.thinking}</div>
-              </details>
-            )}
-            {variant.text && (
-              <div className="bubble-ai-text markdown-body">
-                <MarkdownRenderer content={variant.text} />
+        <div className={`result-card${hasImage ? ' result-card-image' : ''}`}>
+          <div className="result-card-header">
+            <span className="result-card-kicker">Result</span>
+            <span className="result-card-meta">{variant.size}</span>
+          </div>
+          {hasImage && (
+            <div className="result-image-frame">
+              <ImageCard
+                imageId={variant.imageId}
+                imageBase64={variant.imageBase64}
+                size={variant.size}
+                prompt=""
+                timestamp={variant.timestamp}
+                onEdit={onEdit}
+                onFullscreen={(src) => onFullscreen(src, '')}
+              />
+            </div>
+          )}
+          {!hasImage && ((showThinking && variant.thinking) || hasText) ? (
+            <div className="result-copy">
+              {showThinking && variant.thinking && (
+                <details className="thinking-block">
+                  <summary className="thinking-summary">Thinking</summary>
+                  <div className="thinking-content">{variant.thinking}</div>
+                </details>
+              )}
+              {hasText && (
+                <div className="bubble-ai-text markdown-body">
+                  <MarkdownRenderer content={variant.text!} />
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="message-actions">
+            {variants.length > 1 && (
+              <div className="variant-nav">
+                <button
+                  className="variant-nav-btn"
+                  disabled={isGenerating || (msg.activeVariant || 0) === 0}
+                  onClick={() => onVariantChange(index, -1)}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span>{(msg.activeVariant || 0) + 1} / {variants.length}</span>
+                <button
+                  className="variant-nav-btn"
+                  disabled={isGenerating || (msg.activeVariant || 0) >= variants.length - 1}
+                  onClick={() => onVariantChange(index, 1)}
+                >
+                  <ChevronRight size={14} />
+                </button>
               </div>
             )}
+            <button
+              className="message-retry"
+              title={msg.error ? 'Retry generation' : 'Generate another variant'}
+              disabled={isGenerating}
+              onClick={() => onRetry(index)}
+            >
+              <RefreshCw size={16} />
+              <span>Regenerate</span>
+            </button>
           </div>
-          {(variant.imageId || variant.imageBase64) && (
-            <ImageCard
-              imageId={variant.imageId}
-              imageBase64={variant.imageBase64}
-              size={variant.size}
-              prompt=""
-              timestamp={variant.timestamp}
-              onEdit={onEdit}
-              onFullscreen={(src) => onFullscreen(src, '')}
-            />
-          )}
-        </>
+        </div>
       ) : null}
-
-      <div className="message-actions">
-        {variants.length > 1 && (
-          <div className="variant-nav">
-            <button
-              className="variant-nav-btn"
-              disabled={isGenerating || (msg.activeVariant || 0) === 0}
-              onClick={() => onVariantChange(index, -1)}
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span>{(msg.activeVariant || 0) + 1} / {variants.length}</span>
-            <button
-              className="variant-nav-btn"
-              disabled={isGenerating || (msg.activeVariant || 0) >= variants.length - 1}
-              onClick={() => onVariantChange(index, 1)}
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
-        <button
-          className="message-retry"
-          title={msg.error ? 'Retry generation' : 'Generate another variant'}
-          disabled={isGenerating}
-          onClick={() => onRetry(index)}
-        >
-          <RefreshCw size={16} />
-        </button>
-      </div>
     </div>
   );
 });
@@ -432,14 +468,18 @@ export default function Chat() {
           if (msg.role === 'user') {
             return (
               <div key={i} className="message message-user">
-                <div className="bubble-user">
+                <div className="prompt-card">
+                  <div className="prompt-card-header">
+                    <span>Prompt</span>
+                    {msg.imageDataUrl && <span>Reference attached</span>}
+                  </div>
                   {msg.imageDataUrl ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <img src={msg.imageDataUrl} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} alt="" />
-                      <span>{msg.text}</span>
+                    <div className="prompt-card-body has-reference">
+                      <img src={msg.imageDataUrl} className="prompt-reference-thumb" alt="" />
+                      <div className="prompt-text">{msg.text}</div>
                     </div>
                   ) : (
-                    msg.text
+                    <div className="prompt-text">{msg.text}</div>
                   )}
                 </div>
               </div>
