@@ -3,6 +3,7 @@ import type {
   GenerateImageParams,
   GenerateImageResult,
   Message,
+  ProviderConfig,
   StreamDelta,
 } from '../types';
 
@@ -50,6 +51,7 @@ interface RequestPayload {
 
 interface BuildResponsesPayloadParams {
   config: Config;
+  provider: ProviderConfig;
   prompt: string;
   size: string;
   action: string;
@@ -120,6 +122,7 @@ function buildInput(prompt: string, images: string[], history: Message[]): Input
 
 export function buildResponsesPayload({
   config,
+  provider,
   prompt,
   size,
   action,
@@ -135,7 +138,7 @@ export function buildResponsesPayload({
   }
 
   const payload: RequestPayload = {
-    model: config.model || 'gpt-5.4',
+    model: provider.model || 'gpt-5.4',
     input: buildInput(prompt, images, history),
     tools: [tool],
     ...(instructions && { instructions }),

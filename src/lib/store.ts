@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Config, Conversation, GalleryImage } from '../types';
+import type { Config, Conversation, GalleryImage, ProviderConfig } from '../types';
 import { setDB, saveImage, deleteImage, IMAGES_STORE } from './imageStore';
 
 const CONFIG_KEY = 'gpt2image_config';
@@ -130,6 +130,9 @@ function extractConversationImages(conv: Conversation): GalleryImage[] {
           size: v.size || 'auto',
           prompt,
           conversationId: conv.id,
+          providerId: v.providerId,
+          providerName: v.providerName,
+          model: v.model,
           timestamp: v.timestamp || msg.timestamp,
         });
       }
@@ -242,6 +245,82 @@ export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+function createProviderFromLegacy(parsed: Record<string, unknown>): ProviderConfig | null {
+  const baseURL = typeof parsed.baseURL === 'string' ? parsed.baseURL.trim() : '';
+  const apiKey = typeof parsed.apiKey === 'string' ? parsed.apiKey.trim() : '';
+  if (!baseURL || !apiKey) return null;
+  const now = Date.now();
+  return {
+    id: typeof parsed.defaultProviderId === 'string' && parsed.defaultProviderId
+      ? parsed.defaultProviderId
+      : generateId(),
+    name: 'Default',
+    baseURL,
+    apiKey,
+    model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : 'gpt-5.4',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizeProvider(raw: unknown, index: number): ProviderConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const provider = raw as Record<string, unknown>;
+  const baseURL = typeof provider.baseURL === 'string' ? provider.baseURL.trim() : '';
+  const apiKey = typeof provider.apiKey === 'string' ? provider.apiKey.trim() : '';
+  if (!baseURL || !apiKey) return null;
+  const now = Date.now();
+  return {
+    id: typeof provider.id === 'string' && provider.id ? provider.id : generateId(),
+    name: typeof provider.name === 'string' && provider.name.trim()
+      ? provider.name.trim()
+      : `Provider ${index + 1}`,
+    baseURL,
+    apiKey,
+    model: typeof provider.model === 'string' && provider.model.trim()
+      ? provider.model.trim()
+      : 'gpt-5.4',
+    createdAt: typeof provider.createdAt === 'number' ? provider.createdAt : now,
+    updatedAt: typeof provider.updatedAt === 'number' ? provider.updatedAt : now,
+  };
+}
+
+function normalizeConfig(parsed: Record<string, unknown>): Config | null {
+  const providers = Array.isArray(parsed.providers)
+    ? parsed.providers
+      .map((provider, index) => normalizeProvider(provider, index))
+      .filter((provider): provider is ProviderConfig => !!provider)
+    : [];
+
+  if (providers.length === 0) {
+    const legacyProvider = createProviderFromLegacy(parsed);
+    if (legacyProvider) providers.push(legacyProvider);
+  }
+
+  if (providers.length === 0) return null;
+
+  const requestedDefault = typeof parsed.defaultProviderId === 'string'
+    ? parsed.defaultProviderId
+    : '';
+  const defaultProviderId = providers.some((provider) => provider.id === requestedDefault)
+    ? requestedDefault
+    : providers[0].id;
+
+  return {
+    providers,
+    defaultProviderId,
+    showThinking: typeof parsed.showThinking === 'boolean' ? parsed.showThinking : false,
+    thinkingLevel: parsed.thinkingLevel === 'medium'
+      || parsed.thinkingLevel === 'high'
+      || parsed.thinkingLevel === 'xhigh'
+      || parsed.thinkingLevel === 'low'
+      ? parsed.thinkingLevel
+      : 'low',
+    darkMode: typeof parsed.darkMode === 'boolean' ? parsed.darkMode : false,
+    useSystemPrompt: typeof parsed.useSystemPrompt === 'boolean' ? parsed.useSystemPrompt : true,
+  };
+}
+
 interface ConfigState {
   config: Config | null;
   loaded: boolean;
@@ -256,16 +335,14 @@ export const useConfigStore = create<ConfigState>((set) => ({
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const config = normalizeConfig(parsed);
+      if (!config) {
+        set({ config: null, loaded: true });
+        return;
+      }
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
       set({
-        config: {
-          baseURL: parsed.baseURL ?? '',
-          apiKey: parsed.apiKey ?? '',
-          model: parsed.model ?? 'gpt-5.4',
-          showThinking: parsed.showThinking ?? false,
-          thinkingLevel: parsed.thinkingLevel ?? 'low',
-          darkMode: parsed.darkMode ?? false,
-          useSystemPrompt: parsed.useSystemPrompt ?? true,
-        },
+        config,
         loaded: true,
       });
     } else {

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
-export type ToastType = 'info' | 'error';
+export type ToastType = 'info' | 'success' | 'error';
 
 interface ToastItem {
   id: number;
@@ -72,14 +72,21 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
+  const icons: Record<ToastType, string> = {
+    info: 'i',
+    success: '✓',
+    error: '!',
+  };
+
   return (
     <div className="toast-container">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`toast${t.type === 'error' ? ' error' : ''}${t.show ? ' show' : ''}`}
+          className={`toast ${t.type}${t.show ? ' show' : ''}`}
         >
-          {t.message}
+          <span className="toast-icon" aria-hidden="true">{icons[t.type]}</span>
+          <span>{t.message}</span>
         </div>
       ))}
     </div>

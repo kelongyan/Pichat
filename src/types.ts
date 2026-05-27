@@ -1,7 +1,6 @@
 export interface Config {
-  baseURL: string;
-  apiKey: string;
-  model: string;
+  providers: ProviderConfig[];
+  defaultProviderId: string;
   showThinking: boolean;
   thinkingLevel: ThinkingLevel;
   darkMode: boolean;
@@ -9,6 +8,16 @@ export interface Config {
 }
 
 export type ThinkingLevel = 'low' | 'medium' | 'high' | 'xhigh';
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  baseURL: string;
+  apiKey: string;
+  model: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface Conversation {
   id: string;
@@ -35,6 +44,9 @@ export interface Variant {
   imageBase64?: string;
   imageId?: string;
   thinking?: string;
+  providerId?: string;
+  providerName?: string;
+  model?: string;
   size: string;
   timestamp: number;
 }
@@ -45,6 +57,9 @@ export interface GalleryImage {
   size: string;
   prompt: string;
   conversationId: string;
+  providerId?: string;
+  providerName?: string;
+  model?: string;
   timestamp: number;
 }
 
@@ -61,6 +76,7 @@ export interface GenerateImageParams {
   action?: string;
   images?: string[];
   thinking?: string;
+  providerId?: string;
   onStream?: (delta: StreamDelta) => void;
   history?: Message[];
   signal?: AbortSignal;

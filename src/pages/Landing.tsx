@@ -56,6 +56,7 @@ export default function Landing() {
         prompt: data.prompt,
         size: data.size,
         thinking: data.thinking,
+        providerId: data.providerId,
         images: data.images,
         autoSend: true,
       },

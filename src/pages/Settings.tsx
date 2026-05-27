@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 function GithubIcon({ size = 24 }: { size?: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -10,8 +10,8 @@ function GithubIcon({ size = 24 }: { size?: number }) {
 }
 import { Header } from '../components/Header';
 import { useToast } from '../components/Toast';
-import { useConfigStore } from '../lib/store';
-import type { Config } from '../types';
+import { generateId, useConfigStore } from '../lib/store';
+import type { Config, ProviderConfig } from '../types';
 
 const GITHUB_URL = 'https://github.com/kelongyan/Pichat';
 
@@ -21,6 +21,47 @@ function isValidHttpUrl(value: string): boolean {
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
+  }
+}
+
+function createProvider(name = 'New Provider'): ProviderConfig {
+  const now = Date.now();
+  return {
+    id: generateId(),
+    name,
+    baseURL: '',
+    apiKey: '',
+    model: 'gpt-5.4',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function sanitizeProvider(provider: ProviderConfig): ProviderConfig {
+  return {
+    ...provider,
+    name: provider.name.trim() || 'Untitled Provider',
+    baseURL: provider.baseURL.trim(),
+    apiKey: provider.apiKey.trim(),
+    model: provider.model.trim() || 'gpt-5.4',
+    updatedAt: Date.now(),
+  };
+}
+
+function validateProvider(provider: ProviderConfig): string | null {
+  if (!provider.name.trim()) return 'Provider name is required';
+  if (!provider.baseURL.trim() || !provider.apiKey.trim()) return 'Please fill in all provider fields';
+  if (!isValidHttpUrl(provider.baseURL.trim())) return 'Please enter a valid HTTP(S) API Base URL';
+  return null;
+}
+
+async function testProviderConnection(provider: ProviderConfig): Promise<void> {
+  const resp = await fetch(`${provider.baseURL.trim().replace(/\/+$/, '')}/models`, {
+    headers: { Authorization: `Bearer ${provider.apiKey.trim()}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!resp.ok && resp.status !== 404) {
+    throw new Error(`HTTP ${resp.status}`);
   }
 }
 
@@ -38,6 +79,7 @@ function ConnectView() {
   const { show: showToast } = useToast();
   const saveConfig = useConfigStore((s) => s.save);
 
+  const [providerName, setProviderName] = useState('Default');
   const [baseURL, setBaseURL] = useState('https://api.openai.com/v1');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-5.4');
@@ -49,6 +91,7 @@ function ConnectView() {
     const b = baseURL.trim();
     const k = apiKey.trim();
     const m = model.trim() || 'gpt-5.4';
+    const n = providerName.trim() || 'Default';
 
     if (!b || !k) {
       showToast('Please fill in all required fields', { type: 'error' });
@@ -61,23 +104,26 @@ function ConnectView() {
 
     setConnecting(true);
     try {
-      const resp = await fetch(`${b.replace(/\/+$/, '')}/models`, {
-        headers: { Authorization: `Bearer ${k}` },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!resp.ok && resp.status !== 404) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      saveConfig({
+      const now = Date.now();
+      const provider: ProviderConfig = {
+        id: generateId(),
+        name: n,
         baseURL: b,
         apiKey: k,
         model: m,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await testProviderConnection(provider);
+      saveConfig({
+        providers: [provider],
+        defaultProviderId: provider.id,
         showThinking: false,
         thinkingLevel: 'low',
         darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
         useSystemPrompt: true,
       });
-      showToast('Connected successfully');
+      showToast('Connected successfully', { type: 'success' });
       navigate('/create');
     } catch {
       showToast('Connection failed — settings were not saved', { type: 'error' });
@@ -114,6 +160,20 @@ function ConnectView() {
             Connect to an OpenAI-compatible API endpoint
           </p>
           <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="provider-name">
+                Provider Name
+              </label>
+              <input
+                className="form-input"
+                id="provider-name"
+                type="text"
+                value={providerName}
+                onChange={(e) => setProviderName(e.target.value)}
+                placeholder="OpenAI"
+                required
+              />
+            </div>
             <div className="form-group">
               <label className="form-label" htmlFor="base-url">
                 API Base URL
@@ -174,36 +234,81 @@ function FullSettings({ config }: { config: Config }) {
   const { show: showToast } = useToast();
   const saveConfig = useConfigStore((s) => s.save);
 
-  const [baseURL, setBaseURL] = useState(config.baseURL || '');
-  const [apiKey, setApiKey] = useState(config.apiKey || '');
-  const [model, setModel] = useState(config.model || 'gpt-5.4');
+  const [providers, setProviders] = useState<ProviderConfig[]>(
+    config.providers.length ? config.providers : [createProvider('Default')],
+  );
+  const [defaultProviderId, setDefaultProviderId] = useState(
+    config.defaultProviderId || config.providers[0]?.id || '',
+  );
   const [showThinking, setShowThinking] = useState(!!config.showThinking);
   const [useSystemPrompt, setUseSystemPrompt] = useState(config.useSystemPrompt !== false);
+  const [testingId, setTestingId] = useState('');
+
+  function updateProvider(id: string, patch: Partial<ProviderConfig>) {
+    setProviders((items) => items.map((provider) => (
+      provider.id === id ? { ...provider, ...patch } : provider
+    )));
+  }
+
+  function handleAddProvider() {
+    const provider = createProvider(`Provider ${providers.length + 1}`);
+    setProviders((items) => [...items, provider]);
+    if (!defaultProviderId) setDefaultProviderId(provider.id);
+  }
+
+  function handleRemoveProvider(id: string) {
+    if (providers.length <= 1) {
+      showToast('At least one provider is required', { type: 'error' });
+      return;
+    }
+    const nextProviders = providers.filter((provider) => provider.id !== id);
+    setProviders(nextProviders);
+    if (defaultProviderId === id) {
+      setDefaultProviderId(nextProviders[0].id);
+    }
+  }
+
+  async function handleTestProvider(provider: ProviderConfig) {
+    const sanitized = sanitizeProvider(provider);
+    const error = validateProvider(sanitized);
+    if (error) {
+      showToast(error, { type: 'error' });
+      return;
+    }
+    setTestingId(provider.id);
+    try {
+      await testProviderConnection(sanitized);
+      showToast(`${sanitized.name} connected successfully`, { type: 'success' });
+    } catch {
+      showToast(`${sanitized.name} connection failed`, { type: 'error' });
+    } finally {
+      setTestingId('');
+    }
+  }
 
   function handleSave() {
-    const b = baseURL.trim();
-    const k = apiKey.trim();
-    const m = model.trim() || 'gpt-5.4';
-
-    if (!b || !k) {
-      showToast('Please fill in all required fields', { type: 'error' });
-      return;
+    const sanitizedProviders = providers.map(sanitizeProvider);
+    for (const provider of sanitizedProviders) {
+      const error = validateProvider(provider);
+      if (error) {
+        showToast(error, { type: 'error' });
+        return;
+      }
     }
-    if (!isValidHttpUrl(b)) {
-      showToast('Please enter a valid HTTP(S) API Base URL', { type: 'error' });
-      return;
-    }
-
+    const defaultId = sanitizedProviders.some((provider) => provider.id === defaultProviderId)
+      ? defaultProviderId
+      : sanitizedProviders[0].id;
     saveConfig({
-      baseURL: b,
-      apiKey: k,
-      model: m,
+      providers: sanitizedProviders,
+      defaultProviderId: defaultId,
       showThinking,
       thinkingLevel: config.thinkingLevel || 'low',
       darkMode: config.darkMode ?? false,
       useSystemPrompt,
     });
-    showToast('Settings saved');
+    setProviders(sanitizedProviders);
+    setDefaultProviderId(defaultId);
+    showToast('Settings saved', { type: 'success' });
   }
 
   return (
@@ -224,48 +329,114 @@ function FullSettings({ config }: { config: Config }) {
         </div>
 
         <div className="settings-section">
-          <div className="settings-section-title">CONNECTION</div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="base-url">
-              API Base URL
-            </label>
-            <input
-              className="form-input"
-              id="base-url"
-              type="url"
-              value={baseURL}
-              onChange={(e) => setBaseURL(e.target.value)}
-              placeholder="https://api.openai.com/v1"
-              required
-            />
+          <div className="settings-section-title">PROVIDERS</div>
+          <div className="provider-list">
+            {providers.map((provider) => (
+              <div
+                key={provider.id}
+                className={`provider-card${provider.id === defaultProviderId ? ' default' : ''}`}
+              >
+                <div className="provider-card-header">
+                  <div>
+                    <div className="provider-card-title">{provider.name || 'Untitled Provider'}</div>
+                    <div className="provider-card-meta">{provider.model || 'gpt-5.4'}</div>
+                  </div>
+                  <div className="provider-card-actions">
+                    <button
+                      className="provider-action-btn"
+                      type="button"
+                      disabled={provider.id === defaultProviderId}
+                      onClick={() => setDefaultProviderId(provider.id)}
+                    >
+                      {provider.id === defaultProviderId ? 'Default' : 'Set Default'}
+                    </button>
+                    <button
+                      className="provider-action-btn"
+                      type="button"
+                      disabled={testingId === provider.id}
+                      onClick={() => handleTestProvider(provider)}
+                    >
+                      {testingId === provider.id ? 'Testing...' : 'Test'}
+                    </button>
+                    <button
+                      className="provider-icon-btn"
+                      type="button"
+                      title="Remove provider"
+                      disabled={providers.length <= 1}
+                      onClick={() => handleRemoveProvider(provider.id)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="provider-fields">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor={`provider-name-${provider.id}`}>
+                      Provider Name
+                    </label>
+                    <input
+                      className="form-input"
+                      id={`provider-name-${provider.id}`}
+                      type="text"
+                      value={provider.name}
+                      onChange={(e) => updateProvider(provider.id, { name: e.target.value })}
+                      placeholder="OpenAI"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor={`base-url-${provider.id}`}>
+                      API Base URL
+                    </label>
+                    <input
+                      className="form-input"
+                      id={`base-url-${provider.id}`}
+                      type="url"
+                      value={provider.baseURL}
+                      onChange={(e) => updateProvider(provider.id, { baseURL: e.target.value })}
+                      placeholder="https://api.openai.com/v1"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor={`api-key-${provider.id}`}>
+                      API Key
+                    </label>
+                    <input
+                      className="form-input"
+                      id={`api-key-${provider.id}`}
+                      type="password"
+                      value={provider.apiKey}
+                      onChange={(e) => updateProvider(provider.id, { apiKey: e.target.value })}
+                      placeholder="sk-..."
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor={`model-${provider.id}`}>
+                      Model
+                    </label>
+                    <input
+                      className="form-input"
+                      id={`model-${provider.id}`}
+                      type="text"
+                      value={provider.model}
+                      onChange={(e) => updateProvider(provider.id, { model: e.target.value })}
+                      placeholder="gpt-5.4"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="api-key">
-              API Key
-            </label>
-            <input
-              className="form-input"
-              id="api-key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="model">
-              Model
-            </label>
-            <input
-              className="form-input"
-              id="model"
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="gpt-5.4"
-            />
-          </div>
+          <button
+            className="settings-secondary-btn"
+            type="button"
+            onClick={handleAddProvider}
+          >
+            <Plus size={16} /> <span>Add Provider</span>
+          </button>
         </div>
 
         <div className="settings-section">

@@ -8,6 +8,7 @@ import type {
   Config,
   GenerateImageParams,
   GenerateImageResult,
+  ProviderConfig,
 } from '../types';
 
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -118,22 +119,36 @@ function getConfig(): Config | null {
   return useConfigStore.getState().config;
 }
 
+function resolveProvider(config: Config, providerId?: string): ProviderConfig {
+  const requestedId = providerId || config.defaultProviderId;
+  const provider = config.providers.find((item) => item.id === requestedId)
+    || config.providers.find((item) => item.id === config.defaultProviderId)
+    || config.providers[0];
+  if (!provider) {
+    throw new Error('No API provider configured. Add a provider in Settings.');
+  }
+  return provider;
+}
+
 export async function generateImage({
   prompt,
   size = '1024x1024',
   action = 'auto',
   images = [],
   thinking,
+  providerId,
   onStream,
   history = [],
   signal,
 }: GenerateImageParams): Promise<GenerateImageResult> {
   const config = getConfig();
   if (!config) throw new Error('Not configured');
+  const provider = resolveProvider(config, providerId);
 
   const instructions = await getSystemPrompt(config.useSystemPrompt !== false);
   const payload = buildResponsesPayload({
     config,
+    provider,
     prompt,
     size,
     action,
@@ -144,7 +159,7 @@ export async function generateImage({
     stream: !!onStream,
   });
 
-  const url = `${config.baseURL.replace(/\/+$/, '')}/responses`;
+  const url = `${provider.baseURL.replace(/\/+$/, '')}/responses`;
   let response: Response;
   let lastError: Error | null = null;
   const maxAttempts = onStream ? 1 : MAX_RETRIES + 1;
@@ -165,7 +180,7 @@ export async function generateImage({
       response = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${config.apiKey}`,
+          Authorization: `Bearer ${provider.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),

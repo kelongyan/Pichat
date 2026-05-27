@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Plus, ArrowUp, ChevronDown } from 'lucide-react';
+import { Plus, ArrowUp, ChevronDown, Square } from 'lucide-react';
 import { useConfigStore } from '../lib/store';
 import { compressImage } from '../lib/imageStore';
 import type { ThinkingLevel } from '../types';
@@ -14,12 +14,14 @@ export interface SendData {
   prompt: string;
   size: string;
   thinking: string;
+  providerId: string;
   images: string[];
 }
 
 export interface InputBarHandle {
   textInput: HTMLTextAreaElement | null;
   getThinking: () => string;
+  getProviderId: () => string;
   setImages: (imgs: string[]) => void;
   setText: (text: string) => void;
 }
@@ -27,7 +29,10 @@ export interface InputBarHandle {
 interface InputBarProps {
   placeholder?: string;
   onSend: (data: SendData) => void;
+  isGenerating?: boolean;
+  onStop?: () => void;
   initialThinking?: ThinkingLevel;
+  initialProviderId?: string;
 }
 
 const SIZE_PRESETS = [
@@ -50,11 +55,19 @@ const THINKING_PRESETS: { value: ThinkingLevel; label: string }[] = [
 ];
 
 export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function InputBar(
-  { placeholder = 'Describe the image you want...', onSend, initialThinking = 'low' },
+  {
+    placeholder = 'Describe the image you want...',
+    onSend,
+    isGenerating = false,
+    onStop,
+    initialThinking = 'low',
+    initialProviderId,
+  },
   ref,
 ) {
   const config = useConfigStore((s) => s.config);
   const saveConfig = useConfigStore((s) => s.save);
+  const providers = config?.providers || [];
 
   const [selectedSize, setSelectedSize] = useState('auto');
   const [selectedLabel, setSelectedLabel] = useState('Auto');
@@ -63,15 +76,20 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>(
     config?.thinkingLevel || initialThinking,
   );
+  const [selectedProviderId, setSelectedProviderId] = useState(
+    initialProviderId || config?.defaultProviderId || providers[0]?.id || '',
+  );
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [text, setText] = useState('');
   const [sizeOpen, setSizeOpen] = useState(false);
   const [thinkingOpen, setThinkingOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
 
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sizeRef = useRef<HTMLDivElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
+  const providerRef = useRef<HTMLDivElement>(null);
 
   function getSize() {
     if (selectedSize === 'custom') {
@@ -87,20 +105,30 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     () => ({
       textInput: textRef.current,
       getThinking: () => selectedThinking,
+      getProviderId: () => selectedProviderId,
       setImages: (imgs: string[]) => setAttachedImages(imgs),
       setText: (t: string) => setText(t),
     }),
-    [selectedThinking],
+    [selectedThinking, selectedProviderId],
   );
 
   useEffect(() => {
     function handleDocClick(e: MouseEvent) {
       if (sizeRef.current && !sizeRef.current.contains(e.target as Node)) setSizeOpen(false);
       if (thinkingRef.current && !thinkingRef.current.contains(e.target as Node)) setThinkingOpen(false);
+      if (providerRef.current && !providerRef.current.contains(e.target as Node)) setProviderOpen(false);
     }
     document.addEventListener('click', handleDocClick);
     return () => document.removeEventListener('click', handleDocClick);
   }, []);
+
+  useEffect(() => {
+    if (providers.length === 0) return;
+    const nextId = initialProviderId || config?.defaultProviderId || providers[0].id;
+    if (!providers.some((provider) => provider.id === selectedProviderId)) {
+      setSelectedProviderId(nextId);
+    }
+  }, [config?.defaultProviderId, initialProviderId, providers, selectedProviderId]);
 
   useEffect(() => {
     const el = textRef.current;
@@ -121,10 +149,22 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     setSizeOpen(false);
   }
 
+  function selectProvider(providerId: string) {
+    setSelectedProviderId(providerId);
+    setProviderOpen(false);
+  }
+
   function doSend() {
+    if (isGenerating) return;
     const prompt = text.trim();
     if (!prompt) return;
-    onSend({ prompt, size: getSize(), thinking: selectedThinking, images: [...attachedImages] });
+    onSend({
+      prompt,
+      size: getSize(),
+      thinking: selectedThinking,
+      providerId: selectedProviderId,
+      images: [...attachedImages],
+    });
     setText('');
     setAttachedImages([]);
     if (textRef.current) textRef.current.style.height = 'auto';
@@ -165,10 +205,47 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
 
   const initialThinkingLabel =
     THINKING_PRESETS.find((p) => p.value === selectedThinking)?.label || 'Low';
+  const selectedProvider = providers.find((provider) => provider.id === selectedProviderId)
+    || providers[0];
 
   return (
     <div>
       <div className="options-row">
+        {selectedProvider && (
+          <div className="ghost-dropdown" ref={providerRef}>
+            <button
+              className={`ghost-dropdown-trigger${providerOpen ? ' open' : ''}`}
+              title={selectedProvider.name}
+              onClick={(e) => {
+                e.stopPropagation();
+                setProviderOpen((v) => !v);
+                setThinkingOpen(false);
+                setSizeOpen(false);
+              }}
+            >
+              <span className="ghost-dropdown-prefix">Provider</span>
+              <span className="ghost-dropdown-value">{selectedProvider.name}</span>
+              <span className="ghost-dropdown-arrow">
+                <ChevronDown size={12} />
+              </span>
+            </button>
+            <div className={`ghost-dropdown-menu${providerOpen ? ' open' : ''}`}>
+              {providers.map((provider) => (
+                <div
+                  key={provider.id}
+                  className={`ghost-dropdown-item${provider.id === selectedProviderId ? ' active' : ''}`}
+                  title={`${provider.name} · ${provider.model}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectProvider(provider.id);
+                  }}
+                >
+                  {provider.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="ghost-dropdown" ref={thinkingRef}>
           <button
             className={`ghost-dropdown-trigger${thinkingOpen ? ' open' : ''}`}
@@ -176,6 +253,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
               e.stopPropagation();
               setThinkingOpen((v) => !v);
               setSizeOpen(false);
+              setProviderOpen(false);
             }}
           >
             <span className="ghost-dropdown-prefix">Thinking</span>
@@ -207,6 +285,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
               e.stopPropagation();
               setSizeOpen((v) => !v);
               setThinkingOpen(false);
+              setProviderOpen(false);
             }}
           >
             <span className="size-dropdown-label">{selectedLabel}</span>
@@ -322,13 +401,24 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
           }}
           onPaste={handlePaste}
         />
-        <button
-          className="input-bar-send"
-          disabled={!text.trim()}
-          onClick={doSend}
-        >
-          <ArrowUp size={16} />
-        </button>
+        {isGenerating && onStop ? (
+          <button
+            className="input-bar-stop"
+            title="Stop generation"
+            aria-label="Stop generation"
+            onClick={onStop}
+          >
+            <Square size={13} fill="currentColor" />
+          </button>
+        ) : (
+          <button
+            className="input-bar-send"
+            disabled={!text.trim()}
+            onClick={doSend}
+          >
+            <ArrowUp size={16} />
+          </button>
+        )}
       </div>
     </div>
   );

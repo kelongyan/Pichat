@@ -7,10 +7,10 @@ import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
-import { useConversationStore, generateId } from '../lib/store';
+import { useConfigStore, useConversationStore, generateId } from '../lib/store';
 import { saveImage, getImageURL, getImageBlob, revokeAll } from '../lib/imageStore';
 import { buildImageFilename } from '../lib/filename';
-import { ChevronDown, Download, Save, Maximize2, RefreshCw } from 'lucide-react';
+import { ChevronDown, Download, Save, Maximize2, RefreshCw, Play, Square } from 'lucide-react';
 
 const TIER_PRESETS = [
   { value: 1, label: '1' },
@@ -49,12 +49,15 @@ export default function Waterfall() {
   const { open: openLightbox } = useLightbox();
   const toast = useToast();
   const convStore = useConversationStore();
+  const config = useConfigStore((s) => s.config);
 
   const [currentTier, setCurrentTier] = useState(5);
   const [currentPrompt, setCurrentPrompt] = useState('');
   const [currentSize, setCurrentSize] = useState('auto');
   const [currentThinking, setCurrentThinking] = useState('');
+  const [currentProviderId, setCurrentProviderId] = useState('');
   const [isActive, setIsActive] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const cardMapRef = useRef(new Map<string, WaterfallCard>());
   const [cardVersion, setCardVersion] = useState(0);
   const cards = Array.from(cardMapRef.current.values());
@@ -71,6 +74,9 @@ export default function Waterfall() {
   const activeRequestsRef = useRef(0);
   const queuedCardIdsRef = useRef<string[]>([]);
   const drainQueueRef = useRef<() => void>(() => {});
+  const triggerBatchRef = useRef<() => void>(() => {});
+  const isPausedRef = useRef(false);
+  const resumeAfterPauseRef = useRef(false);
   const sessionCountRef = useRef(0);
   const milestoneShownRef = useRef(new Set<number>());
   const abortControllersRef = useRef<AbortController[]>([]);
@@ -80,6 +86,7 @@ export default function Waterfall() {
   const currentPromptRef = useRef('');
   const currentSizeRef = useRef('auto');
   const currentThinkingRef = useRef('');
+  const currentProviderIdRef = useRef('');
   const currentTierRef = useRef(5);
   const currentImagesRef = useRef<string[]>([]);
 
@@ -93,7 +100,9 @@ export default function Waterfall() {
   useEffect(() => { currentPromptRef.current = currentPrompt; }, [currentPrompt]);
   useEffect(() => { currentSizeRef.current = currentSize; }, [currentSize]);
   useEffect(() => { currentThinkingRef.current = currentThinking; }, [currentThinking]);
+  useEffect(() => { currentProviderIdRef.current = currentProviderId; }, [currentProviderId]);
   useEffect(() => { currentTierRef.current = currentTier; }, [currentTier]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
   useEffect(() => {
     if (!hasSeenFirstTimeWarning()) {
@@ -121,6 +130,8 @@ export default function Waterfall() {
       prompt: currentPromptRef.current,
       size: currentSizeRef.current,
       thinking: currentThinkingRef.current,
+      providerId: currentProviderIdRef.current,
+      action: currentImagesRef.current.length ? 'edit' : 'auto',
       images: currentImagesRef.current,
       signal: controller.signal,
       onStream: (delta) => {
@@ -136,9 +147,12 @@ export default function Waterfall() {
       },
     })
       .then(async (result) => {
+        if (controller.signal.aborted) return;
         if (result.imageBase64) {
           const imageId = await saveImage(result.imageBase64);
+          if (controller.signal.aborted) return;
           const imageUrl = await getImageURL(imageId);
+          if (controller.signal.aborted) return;
           const card = cardMapRef.current.get(cardId);
           if (card) {
             cardMapRef.current.set(cardId, { ...card, state: 'image', imageId, imageUrl, imageBase64: result.imageBase64!, aspectRatio: '' });
@@ -169,10 +183,19 @@ export default function Waterfall() {
         const idx = abortControllersRef.current.indexOf(controller);
         if (idx >= 0) abortControllersRef.current.splice(idx, 1);
         drainQueueRef.current();
+        if (
+          activeRequestsRef.current === 0
+          && resumeAfterPauseRef.current
+          && !isPausedRef.current
+        ) {
+          resumeAfterPauseRef.current = false;
+          triggerBatchRef.current();
+        }
       });
   }, []);
 
   const drainQueue = useCallback(() => {
+    if (isPausedRef.current) return;
     while (
       activeRequestsRef.current < MAX_CONCURRENT_REQUESTS
       && queuedCardIdsRef.current.length > 0
@@ -193,7 +216,7 @@ export default function Waterfall() {
 
   const triggerBatch = useCallback(async () => {
     const prompt = currentPromptRef.current;
-    if (!prompt || warningBlockRef.current) return;
+    if (!prompt || warningBlockRef.current || isPausedRef.current) return;
 
     const tier = currentTierRef.current;
     const maxPending = Math.max(tier, MAX_CONCURRENT_REQUESTS) * MAX_PENDING_BATCHES;
@@ -224,11 +247,15 @@ export default function Waterfall() {
   }, [enqueueCard]);
 
   useEffect(() => {
+    triggerBatchRef.current = triggerBatch;
+  }, [triggerBatch]);
+
+  useEffect(() => {
     if (!loadTriggerRef.current || !scrollContainerRef.current) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0].isIntersecting) return;
-        if (!currentPromptRef.current || loadingMoreRef.current) return;
+        if (!currentPromptRef.current || loadingMoreRef.current || isPausedRef.current) return;
         const maxPending = Math.max(currentTierRef.current, MAX_CONCURRENT_REQUESTS) * MAX_PENDING_BATCHES;
         if (activeRequestsRef.current + queuedCardIdsRef.current.length >= maxPending) return;
         loadingMoreRef.current = true;
@@ -250,9 +277,43 @@ export default function Waterfall() {
     currentPromptRef.current = data.prompt.trim();
     setCurrentSize(data.size || 'auto');
     setCurrentThinking(data.thinking || inputRef.current?.getThinking() || '');
+    setCurrentProviderId(data.providerId || inputRef.current?.getProviderId() || '');
+    currentProviderIdRef.current = data.providerId || inputRef.current?.getProviderId() || '';
     currentImagesRef.current = data.images || [];
+    isPausedRef.current = false;
+    setIsPaused(false);
     setIsActive(true);
     await triggerBatch();
+  }
+
+  function handlePauseGeneration() {
+    isPausedRef.current = true;
+    resumeAfterPauseRef.current = false;
+    setIsPaused(true);
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+
+    const queuedIds = queuedCardIdsRef.current;
+    queuedCardIdsRef.current = [];
+    for (const id of queuedIds) {
+      cardMapRef.current.delete(id);
+    }
+    for (const ctrl of abortControllersRef.current) {
+      ctrl.abort();
+    }
+    setCardVersion((v) => v + 1);
+    toast.show('Generation paused');
+  }
+
+  function handleResumeGeneration() {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    toast.show('Generation resumed');
+    if (activeRequestsRef.current > 0) {
+      resumeAfterPauseRef.current = true;
+      return;
+    }
+    triggerBatch();
   }
 
   function handleChip(text: string) {
@@ -262,6 +323,9 @@ export default function Waterfall() {
 
   async function saveToGallery(imageId: string, prompt: string) {
     const now = Date.now();
+    const provider = config?.providers.find((item) => item.id === currentProviderIdRef.current)
+      || config?.providers.find((item) => item.id === config.defaultProviderId)
+      || config?.providers[0];
     const conv = {
       id: generateId(),
       createdAt: now,
@@ -269,14 +333,21 @@ export default function Waterfall() {
         { role: 'user' as const, text: prompt, timestamp: now },
         {
           role: 'assistant' as const,
-          variants: [{ imageId, size: 'auto', timestamp: now }],
+          variants: [{
+            imageId,
+            providerId: provider?.id,
+            providerName: provider?.name,
+            model: provider?.model,
+            size: 'auto',
+            timestamp: now,
+          }],
           activeVariant: 0,
           timestamp: now,
         },
       ],
     };
     await convStore.save(conv);
-    toast.show('Saved to Gallery');
+    toast.show('Saved to Gallery', { type: 'success' });
   }
 
   function handleRetryCard(cardId: string) {
@@ -332,6 +403,17 @@ export default function Waterfall() {
               ))}
             </div>
           </div>
+          {isActive && (
+            <button
+              className={`waterfall-control-btn${isPaused ? ' paused' : ''}`}
+              type="button"
+              title={isPaused ? 'Resume generation' : 'Pause generation'}
+              onClick={isPaused ? handleResumeGeneration : handlePauseGeneration}
+            >
+              {isPaused ? <Play size={14} fill="currentColor" /> : <Square size={12} fill="currentColor" />}
+              <span>{isPaused ? 'Resume' : 'Pause'}</span>
+            </button>
+          )}
         </div>
 
         {!isActive && (
@@ -456,9 +538,9 @@ export default function Waterfall() {
                 </div>
               ))}
             </div>
-            <div className={`waterfall-load-trigger${loadingMore ? ' loading' : ''}`} ref={loadTriggerRef}>
-              <div className="waterfall-load-arrow">{loadingMore ? '⟳' : '↓'}</div>
-              <div className="waterfall-load-text">{loadingMore ? 'Generating...' : 'Scroll to generate more'}</div>
+            <div className={`waterfall-load-trigger${loadingMore ? ' loading' : ''}${isPaused ? ' paused' : ''}`} ref={loadTriggerRef}>
+              <div className="waterfall-load-arrow">{isPaused ? '||' : loadingMore ? '⟳' : '↓'}</div>
+              <div className="waterfall-load-text">{isPaused ? 'Generation paused' : loadingMore ? 'Generating...' : 'Scroll to generate more'}</div>
             </div>
           </div>
         )}
