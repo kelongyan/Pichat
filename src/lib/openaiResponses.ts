@@ -95,7 +95,7 @@ function buildInput(prompt: string, images: string[], history: Message[]): Input
 
   for (const msg of history) {
     if (msg.role === 'user') {
-      const content: InputMessage['content'] = [{ type: 'input_text', text: msg.text || '' }];
+      const content: InputMessage['content'] = [{ type: 'input_text', text: msg.generationPrompt || msg.text || '' }];
       if (msg.imageDataUrl) {
         content.push({ type: 'input_image', image_url: msg.imageDataUrl });
       }

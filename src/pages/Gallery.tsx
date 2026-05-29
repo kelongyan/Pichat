@@ -4,7 +4,6 @@ import { Image as ImageIcon } from 'lucide-react';
 import { Header } from '../components/Header';
 import { ImageCard } from '../components/ImageCard';
 import { useLightbox } from '../components/Lightbox';
-import { useToast } from '../components/Toast';
 import { useConversationStore } from '../lib/store';
 import { getImageURL, revokeAll } from '../lib/imageStore';
 import type { GalleryImage } from '../types';
@@ -14,7 +13,6 @@ const PAGE_SIZE = 20;
 export default function Gallery() {
   const navigate = useNavigate();
   const { open: openLightbox } = useLightbox();
-  const { show: showToast } = useToast();
   const getImagePage = useConversationStore((s) => s.getImagePage);
 
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -67,8 +65,7 @@ export default function Gallery() {
 
   const handleEdit = useCallback((src: string) => {
     navigate('/chat', { state: { images: [src] } });
-    showToast('Reference image attached');
-  }, [navigate, showToast]);
+  }, [navigate]);
 
   const handleFullscreen = useCallback((img: GalleryImage) => {
     if (img.imageId) {

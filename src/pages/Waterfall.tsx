@@ -89,6 +89,7 @@ export default function Waterfall() {
   const currentProviderIdRef = useRef('');
   const currentTierRef = useRef(5);
   const currentImagesRef = useRef<string[]>([]);
+  const currentGenerationPromptRef = useRef('');
 
   useEffect(() => {
     if (!tierOpen) return;
@@ -127,7 +128,7 @@ export default function Waterfall() {
     abortControllersRef.current.push(controller);
 
     generateImage({
-      prompt: currentPromptRef.current,
+      prompt: currentGenerationPromptRef.current || currentPromptRef.current,
       size: currentSizeRef.current,
       thinking: currentThinkingRef.current,
       providerId: currentProviderIdRef.current,
@@ -275,6 +276,7 @@ export default function Waterfall() {
     if (!data.prompt.trim()) return;
     setCurrentPrompt(data.prompt.trim());
     currentPromptRef.current = data.prompt.trim();
+    currentGenerationPromptRef.current = data.generationPrompt || data.prompt.trim();
     setCurrentSize(data.size || 'auto');
     setCurrentThinking(data.thinking || inputRef.current?.getThinking() || '');
     setCurrentProviderId(data.providerId || inputRef.current?.getProviderId() || '');
@@ -323,6 +325,7 @@ export default function Waterfall() {
 
   async function saveToGallery(imageId: string, prompt: string) {
     const now = Date.now();
+    const generationPrompt = currentGenerationPromptRef.current;
     const provider = config?.providers.find((item) => item.id === currentProviderIdRef.current)
       || config?.providers.find((item) => item.id === config.defaultProviderId)
       || config?.providers[0];
@@ -330,7 +333,12 @@ export default function Waterfall() {
       id: generateId(),
       createdAt: now,
       messages: [
-        { role: 'user' as const, text: prompt, timestamp: now },
+        {
+          role: 'user' as const,
+          text: prompt,
+          generationPrompt: generationPrompt && generationPrompt !== prompt ? generationPrompt : undefined,
+          timestamp: now,
+        },
         {
           role: 'assistant' as const,
           variants: [{

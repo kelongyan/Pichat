@@ -222,6 +222,7 @@ export default function Chat() {
   const state = (location.state || {}) as {
     conversationId?: string;
     prompt?: string;
+    generationPrompt?: string;
     size?: string;
     thinking?: string;
     providerId?: string;
@@ -240,6 +241,7 @@ export default function Chat() {
   const [showStream, setShowStream] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const autoSentRef = useRef(false);
+  const stateImagesAppliedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const handleSendRef = useRef<(d: SendData) => Promise<void>>(() => Promise.resolve());
 
@@ -277,14 +279,17 @@ export default function Chat() {
 
   useEffect(() => {
     if (!conversation) return;
-    if (state.images?.length && !autoSentRef.current) {
+    if (state.images?.length && !autoSentRef.current && !stateImagesAppliedRef.current) {
+      stateImagesAppliedRef.current = true;
       inputRef.current?.setImages(state.images);
+      if (!state.autoSend) inputRef.current?.textInput?.focus();
     }
     if (state.autoSend && state.prompt && !autoSentRef.current) {
       autoSentRef.current = true;
       clearAutoSendState(conversation.id);
       handleSendRef.current({
         prompt: state.prompt,
+        generationPrompt: state.generationPrompt,
         size: state.size || 'auto',
         thinking: state.thinking || 'low',
         providerId: state.providerId || config?.defaultProviderId || '',
@@ -319,6 +324,7 @@ export default function Chat() {
     updatedConv.messages = [...updatedConv.messages, {
       role: 'user' as const,
       text: data.prompt,
+      generationPrompt: data.generationPrompt,
       imageDataUrl: data.images?.length ? data.images[0] : undefined,
       timestamp: Date.now(),
     }];
@@ -335,7 +341,7 @@ export default function Chat() {
       abortRef.current = ctrl;
       const historyMessages = updatedConv.messages.slice(0, -1);
       const result = await generateImage({
-        prompt: data.prompt,
+        prompt: data.generationPrompt || data.prompt,
         size: data.size,
         thinking: data.thinking,
         providerId: data.providerId,
@@ -432,7 +438,7 @@ export default function Chat() {
       ctrl = new AbortController();
       abortRef.current = ctrl;
       const result = await generateImage({
-        prompt: userMsg.text || '',
+        prompt: userMsg.generationPrompt || userMsg.text || '',
         size: retrySize,
         thinking: thinkingLevel,
         providerId: retryProviderId,
@@ -522,8 +528,7 @@ export default function Chat() {
   const handleEdit = useCallback((src: string) => {
     inputRef.current?.setImages([src]);
     inputRef.current?.textInput?.focus();
-    toast.show('Reference image attached — describe your edits');
-  }, [toast]);
+  }, []);
 
   const handleFullscreen = useCallback((src: string, prompt: string) => {
     openLightbox(src, { prompt });

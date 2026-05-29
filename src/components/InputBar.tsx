@@ -8,10 +8,22 @@ import {
 import { Plus, ArrowUp, ChevronDown, Square } from 'lucide-react';
 import { useConfigStore } from '../lib/store';
 import { compressImage } from '../lib/imageStore';
+import {
+  ASPECT_OPTIONS,
+  QUICK_PRESET_OPTIONS,
+  RESOLUTION_OPTIONS,
+  applyQuickPresetToPrompt,
+  getQuickPresetDefaults,
+  resolveImageSize,
+  type ImageAspect,
+  type ImageResolution,
+  type QuickPreset,
+} from '../lib/imagePresets';
 import type { ThinkingLevel } from '../types';
 
 export interface SendData {
   prompt: string;
+  generationPrompt?: string;
   size: string;
   thinking: string;
   providerId: string;
@@ -35,18 +47,6 @@ interface InputBarProps {
   initialProviderId?: string;
 }
 
-const SIZE_PRESETS = [
-  { value: 'auto', label: 'Auto' },
-  { value: '1024x1024', label: '1024 × 1024 (1:1)' },
-  { value: '1536x1024', label: '1536 × 1024 (3:2)' },
-  { value: '1024x1536', label: '1024 × 1536 (2:3)' },
-  { value: '1792x1024', label: '1792 × 1024 (16:9)' },
-  { value: '1024x1792', label: '1024 × 1792 (9:16)' },
-  { value: '2560x1440', label: '2560 × 1440 (2K)' },
-  { value: '3840x2160', label: '3840 × 2160 (4K)' },
-  { value: 'custom', label: 'Custom...' },
-];
-
 const THINKING_PRESETS: { value: ThinkingLevel; label: string }[] = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -69,8 +69,9 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const saveConfig = useConfigStore((s) => s.save);
   const providers = config?.providers || [];
 
-  const [selectedSize, setSelectedSize] = useState('auto');
-  const [selectedLabel, setSelectedLabel] = useState('Auto');
+  const [selectedAspect, setSelectedAspect] = useState<ImageAspect>('auto');
+  const [selectedResolution, setSelectedResolution] = useState<ImageResolution>('standard');
+  const [selectedQuickPreset, setSelectedQuickPreset] = useState<QuickPreset>('none');
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
   const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>(
@@ -81,23 +82,21 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   );
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [text, setText] = useState('');
-  const [sizeOpen, setSizeOpen] = useState(false);
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
 
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const sizeRef = useRef<HTMLDivElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const providerRef = useRef<HTMLDivElement>(null);
 
   function getSize() {
-    if (selectedSize === 'custom') {
+    if (selectedAspect === 'custom') {
       const w = Math.min(4096, Math.max(256, parseInt(customW) || 1024));
       const h = Math.min(4096, Math.max(256, parseInt(customH) || 1024));
       return `${w}x${h}`;
     }
-    return selectedSize;
+    return resolveImageSize(selectedAspect, selectedResolution);
   }
 
   useImperativeHandle(
@@ -114,7 +113,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
 
   useEffect(() => {
     function handleDocClick(e: MouseEvent) {
-      if (sizeRef.current && !sizeRef.current.contains(e.target as Node)) setSizeOpen(false);
       if (thinkingRef.current && !thinkingRef.current.contains(e.target as Node)) setThinkingOpen(false);
       if (providerRef.current && !providerRef.current.contains(e.target as Node)) setProviderOpen(false);
     }
@@ -143,10 +141,27 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     setThinkingOpen(false);
   }
 
-  function selectSize(value: string, label: string) {
-    setSelectedSize(value);
-    setSelectedLabel(value === 'custom' ? 'Custom' : label);
-    setSizeOpen(false);
+  function selectAspect(value: ImageAspect) {
+    setSelectedAspect(value);
+    if (selectedQuickPreset !== 'none') {
+      setSelectedQuickPreset('none');
+    }
+  }
+
+  function selectQuickPreset(value: Exclude<QuickPreset, 'none'>) {
+    const nextPreset: QuickPreset = selectedQuickPreset === value ? 'none' : value;
+    setSelectedQuickPreset(nextPreset);
+    const defaults = getQuickPresetDefaults(nextPreset);
+    if (defaults.aspect) {
+      setSelectedAspect(defaults.aspect);
+    }
+  }
+
+  function selectResolution(value: ImageResolution) {
+    setSelectedResolution(value);
+    if (selectedAspect === 'auto') {
+      setSelectedAspect('1:1');
+    }
   }
 
   function selectProvider(providerId: string) {
@@ -158,8 +173,10 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     if (isGenerating) return;
     const prompt = text.trim();
     if (!prompt) return;
+    const generationPrompt = applyQuickPresetToPrompt(prompt, selectedQuickPreset);
     onSend({
       prompt,
+      generationPrompt: generationPrompt === prompt ? undefined : generationPrompt,
       size: getSize(),
       thinking: selectedThinking,
       providerId: selectedProviderId,
@@ -207,6 +224,9 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     THINKING_PRESETS.find((p) => p.value === selectedThinking)?.label || 'Low';
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId)
     || providers[0];
+  const inputPlaceholder = attachedImages.length > 0
+    ? 'What would you like to change or keep?'
+    : placeholder;
 
   return (
     <div>
@@ -220,7 +240,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
                 e.stopPropagation();
                 setProviderOpen((v) => !v);
                 setThinkingOpen(false);
-                setSizeOpen(false);
               }}
             >
               <span className="ghost-dropdown-prefix">Provider</span>
@@ -252,7 +271,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
             onClick={(e) => {
               e.stopPropagation();
               setThinkingOpen((v) => !v);
-              setSizeOpen(false);
               setProviderOpen(false);
             }}
           >
@@ -277,40 +295,65 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
             ))}
           </div>
         </div>
-        <div style={{ flex: 1 }} />
-        <div className="size-dropdown" ref={sizeRef}>
-          <button
-            className={`size-dropdown-trigger${sizeOpen ? ' open' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSizeOpen((v) => !v);
-              setThinkingOpen(false);
-              setProviderOpen(false);
-            }}
-          >
-            <span className="size-dropdown-label">{selectedLabel}</span>
-            <span className="size-dropdown-arrow">
-              <ChevronDown size={14} />
-            </span>
-          </button>
-          <div className={`size-dropdown-menu${sizeOpen ? ' open' : ''}`}>
-            {SIZE_PRESETS.map((p) => (
-              <div
-                key={p.value}
-                className={`size-dropdown-item${p.value === selectedSize ? ' active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  selectSize(p.value, p.label);
-                }}
+      </div>
+
+      <div className="generation-settings" aria-label="Image generation settings">
+        <div className="generation-setting-group">
+          <span className="generation-setting-label">Ratio</span>
+          <div className="generation-pill-row">
+            {ASPECT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`generation-pill${selectedAspect === option.value ? ' active' : ''}`}
+                title={option.title}
+                aria-pressed={selectedAspect === option.value}
+                onClick={() => selectAspect(option.value)}
               >
-                {p.label}
-              </div>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="generation-setting-group">
+          <span className="generation-setting-label">Quality</span>
+          <div className="generation-pill-row">
+            {RESOLUTION_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`generation-pill${selectedResolution === option.value ? ' active' : ''}`}
+                title={option.title}
+                aria-pressed={selectedResolution === option.value}
+                onClick={() => selectResolution(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="generation-setting-group generation-setting-group-wide">
+          <span className="generation-setting-label">Quick</span>
+          <div className="generation-pill-row">
+            {QUICK_PRESET_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`generation-pill generation-pill-quick${selectedQuickPreset === option.value ? ' active' : ''}`}
+                title={option.title}
+                aria-pressed={selectedQuickPreset === option.value}
+                onClick={() => selectQuickPreset(option.value)}
+              >
+                {option.label}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      {selectedSize === 'custom' && (
+      {selectedAspect === 'custom' && (
         <div className="size-custom-row" style={{ display: 'flex' }}>
           <input
             type="number"
@@ -338,35 +381,29 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
       )}
 
       {attachedImages.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 6,
-            padding: '0 0 8px',
-          }}
-        >
-          {attachedImages.map((src, i) => (
-            <div
-              key={i}
-              title="Click to remove"
-              onClick={() => removeImage(i)}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 6,
-                overflow: 'hidden',
-                position: 'relative',
-                cursor: 'pointer',
-              }}
-            >
-              <img
-                src={src}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                alt=""
-              />
-            </div>
-          ))}
+        <div className="reference-preview" aria-live="polite">
+          <div className="reference-preview-thumbs">
+            {attachedImages.map((src, i) => (
+              <button
+                key={i}
+                type="button"
+                className="reference-preview-thumb"
+                title="Remove reference image"
+                aria-label={`Remove reference image ${i + 1}`}
+                onClick={() => removeImage(i)}
+              >
+                <img src={src} alt="" />
+              </button>
+            ))}
+          </div>
+          <div className="reference-preview-copy">
+            <span className="reference-preview-title">
+              {attachedImages.length === 1
+                ? 'Using this image as the starting point'
+                : `Using ${attachedImages.length} images as the starting point`}
+            </span>
+            <span className="reference-preview-hint">Write what should change or stay.</span>
+          </div>
         </div>
       )}
 
@@ -389,7 +426,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
         <textarea
           ref={textRef}
           className="input-bar-text"
-          placeholder={placeholder}
+          placeholder={inputPlaceholder}
           rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}

@@ -28,6 +28,7 @@ export interface Conversation {
 export interface Message {
   role: 'user' | 'assistant';
   text?: string;
+  generationPrompt?: string;
   imageDataUrl?: string;
   variants?: Variant[];
   activeVariant?: number;

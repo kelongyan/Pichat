@@ -54,6 +54,7 @@ export default function Landing() {
     navigate('/chat', {
       state: {
         prompt: data.prompt,
+        generationPrompt: data.generationPrompt,
         size: data.size,
         thinking: data.thinking,
         providerId: data.providerId,
