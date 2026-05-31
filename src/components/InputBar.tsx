@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Plus, ArrowUp, ChevronDown, Square, WandSparkles, FileText } from 'lucide-react';
+import { Plus, ArrowUp, ChevronDown, Square, WandSparkles, FileText, Save } from 'lucide-react';
 import { useConfigStore } from '../lib/store';
 import { compressImage } from '../lib/imageStore';
 import {
@@ -17,8 +17,6 @@ import {
 } from '../lib/imagePresets';
 import {
   buildGenerationPrompt,
-  DEFAULT_PROMPT_STUDIO_STATE,
-  getUseCaseDefaults,
   hasPromptStudioSelections,
   parsePromptStudioState,
   PROMPT_STUDIO_STORAGE_KEY,
@@ -43,6 +41,11 @@ import {
   loadPromptTemplates,
   type PromptTemplate,
 } from '../lib/promptTemplates';
+import {
+  loadGenerationPreferences,
+  saveGenerationPreferences,
+  resolveStudioUseCaseAspectDefault,
+} from '../lib/generationPreferences';
 import type { ThinkingLevel } from '../types';
 
 export interface SendData {
@@ -121,11 +124,12 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const config = useConfigStore((s) => s.config);
   const saveConfig = useConfigStore((s) => s.save);
   const providers = config?.providers || [];
+  const [initialPreferences] = useState(() => loadGenerationPreferences());
 
-  const [selectedAspect, setSelectedAspect] = useState<ImageAspect>('auto');
-  const [selectedResolution, setSelectedResolution] = useState<ImageResolution>('standard');
-  const [customW, setCustomW] = useState('');
-  const [customH, setCustomH] = useState('');
+  const [selectedAspect, setSelectedAspect] = useState<ImageAspect>(initialPreferences.aspect);
+  const [selectedResolution, setSelectedResolution] = useState<ImageResolution>(initialPreferences.resolution);
+  const [customW, setCustomW] = useState(initialPreferences.customW);
+  const [customH, setCustomH] = useState(initialPreferences.customH);
   const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>(
     config?.thinkingLevel || initialThinking,
   );
@@ -140,8 +144,9 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>(() => loadPromptTemplates());
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioState, setStudioState] = useState<PromptStudioState>(() => {
-    if (typeof window === 'undefined') return DEFAULT_PROMPT_STUDIO_STATE;
-    return parsePromptStudioState(window.localStorage.getItem(PROMPT_STUDIO_STORAGE_KEY));
+    if (typeof window === 'undefined') return initialPreferences.studio;
+    const storedStudio = window.localStorage.getItem(PROMPT_STUDIO_STORAGE_KEY);
+    return storedStudio ? parsePromptStudioState(storedStudio) : initialPreferences.studio;
   });
 
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -194,6 +199,16 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   }, [studioState]);
 
   useEffect(() => {
+    saveGenerationPreferences({
+      aspect: selectedAspect,
+      resolution: selectedResolution,
+      customW,
+      customH,
+      studio: studioState,
+    });
+  }, [customH, customW, selectedAspect, selectedResolution, studioState]);
+
+  useEffect(() => {
     if (providers.length === 0) return;
     const nextId = initialProviderId || config?.defaultProviderId || providers[0].id;
     if (!providers.some((provider) => provider.id === selectedProviderId)) {
@@ -229,12 +244,19 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     setStudioState((prev) => {
       const next = { ...prev, [key]: value } as PromptStudioState;
       if (key === 'useCase') {
-        const defaults = getUseCaseDefaults(value as StudioUseCase);
-        if (defaults.aspect) {
-          setSelectedAspect(defaults.aspect);
-        }
+        setSelectedAspect((currentAspect) => resolveStudioUseCaseAspectDefault(currentAspect, value as StudioUseCase));
       }
       return next;
+    });
+  }
+
+  function handleSavePreferences() {
+    saveGenerationPreferences({
+      aspect: selectedAspect,
+      resolution: selectedResolution,
+      customW,
+      customH,
+      studio: studioState,
     });
   }
 
@@ -253,6 +275,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     if (isGenerating) return;
     const prompt = text.trim();
     if (!prompt) return;
+    handleSavePreferences();
     const generationPrompt = buildGenerationPrompt(prompt, studioState);
     onSend({
       prompt,
@@ -318,6 +341,15 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
         >
           <WandSparkles size={14} />
           <span>Studio</span>
+        </button>
+        <button
+          type="button"
+          className="studio-toggle save"
+          title="Save generation settings"
+          onClick={handleSavePreferences}
+        >
+          <Save size={14} />
+          <span>Save</span>
         </button>
         {promptTemplates.length > 0 && (
           <div className="ghost-dropdown prompt-template-dropdown" ref={templateRef}>
