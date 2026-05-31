@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Download, Pencil, Maximize2 } from 'lucide-react';
+import { Download, Pencil, Maximize2, Copy, Sparkles } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
 import { getImageURL, getThumbURL, getImageBlob, getImageBase64 } from '../lib/imageStore';
+import { getImageActionLabel, type ImageAction } from '../lib/imageActions';
+
+type CardImageAction = Exclude<ImageAction, 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
+
+const CARD_ACTIONS: CardImageAction[] = ['same', 'style', 'background', 'ratio'];
 
 interface ImageCardProps {
   imageBase64?: string;
@@ -12,6 +17,8 @@ interface ImageCardProps {
   useThumbnail?: boolean;
   onEdit?: (src: string) => void;
   onFullscreen?: (src: string) => void;
+  onCopyPrompt?: () => void;
+  onAction?: (action: CardImageAction, src: string) => void;
 }
 
 export function ImageCard({
@@ -23,6 +30,8 @@ export function ImageCard({
   useThumbnail = false,
   onEdit,
   onFullscreen,
+  onCopyPrompt,
+  onAction,
 }: ImageCardProps) {
   const [src, setSrc] = useState(() =>
     imageBase64 ? `data:image/png;base64,${imageBase64}` : ''
@@ -57,19 +66,27 @@ export function ImageCard({
     }
   }
 
+  async function getReferenceSrc(): Promise<string> {
+    if (imageId) {
+      const base64 = await getImageBase64(imageId);
+      if (base64) return `data:image/png;base64,${base64}`;
+    }
+    return fullSrc || src;
+  }
+
   function handleEdit(e: React.MouseEvent) {
     e.stopPropagation();
-    if (imageId) {
-      getImageBase64(imageId).then((base64) => {
-        if (base64) {
-          onEdit?.(`data:image/png;base64,${base64}`);
-        } else {
-          onEdit?.(fullSrc || src);
-        }
-      });
-    } else {
-      onEdit?.(src);
-    }
+    getReferenceSrc().then((refSrc) => onEdit?.(refSrc));
+  }
+
+  function handleCopyPrompt(e: React.MouseEvent) {
+    e.stopPropagation();
+    onCopyPrompt?.();
+  }
+
+  function handleAction(e: React.MouseEvent, action: CardImageAction) {
+    e.stopPropagation();
+    getReferenceSrc().then((refSrc) => onAction?.(action, refSrc));
   }
 
   function handleFullscreen(e: React.MouseEvent) {
@@ -97,6 +114,30 @@ export function ImageCard({
         >
           <Download size={14} />
         </button>
+        {(onCopyPrompt || onAction) && (
+          <div className="image-card-action-stack">
+            {onCopyPrompt && (
+              <button
+                className="image-card-btn copy"
+                title="Copy prompt"
+                onClick={handleCopyPrompt}
+              >
+                <Copy size={12} /> Copy
+              </button>
+            )}
+            {onAction && CARD_ACTIONS.map((action) => (
+              <button
+                key={action}
+                className={`image-card-btn action action-${action}`}
+                title={`${getImageActionLabel(action)} from this image`}
+                onClick={(e) => handleAction(e, action)}
+              >
+                <Sparkles size={11} />
+                {getImageActionLabel(action)}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           className="image-card-btn edit"
           title="Edit with this image as reference"

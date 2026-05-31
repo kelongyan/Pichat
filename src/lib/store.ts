@@ -149,8 +149,8 @@ function toGalleryRecords(conv: Conversation): GalleryIndexRecord[] {
 }
 
 function toGalleryImage(record: GalleryIndexRecord): GalleryImage {
-  const { id: _id, ...image } = record;
-  return image;
+  const { id, ...image } = record;
+  return { ...image, id };
 }
 
 function extractImageIds(conv: Conversation): string[] {

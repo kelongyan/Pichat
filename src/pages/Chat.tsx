@@ -10,6 +10,8 @@ import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
 import { saveImage } from '../lib/imageStore';
 import { useConfigStore, useConversationStore, generateId } from '../lib/store';
+import { buildImageActionPrompt, type ImageAction } from '../lib/imageActions';
+import { recordGenerationOutcome } from '../lib/providerStats';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Conversation, Message, Variant, ThinkingLevel } from '../types';
 
@@ -23,6 +25,18 @@ function getActiveVariant(msg: Message): Variant | null {
   const variants = getVariants(msg);
   const idx = msg.activeVariant || 0;
   return variants[idx] || variants[0] || null;
+}
+
+function getReferenceImages(msg: Message): string[] {
+  if (msg.imageDataUrls?.length) return msg.imageDataUrls;
+  return msg.imageDataUrl ? [msg.imageDataUrl] : [];
+}
+
+function findPreviousUser(messages: Message[], fromIndex: number): Message | null {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i];
+  }
+  return null;
 }
 
 interface StreamState {
@@ -105,6 +119,9 @@ const MessageBubble = memo(function MessageBubble({
   onVariantChange,
   onEdit,
   onFullscreen,
+  onCopyPrompt,
+  onImageAction,
+  prompt,
 }: {
   msg: Message;
   index: number;
@@ -114,6 +131,9 @@ const MessageBubble = memo(function MessageBubble({
   onVariantChange: (idx: number, dir: -1 | 1) => void;
   onEdit: (src: string) => void;
   onFullscreen: (src: string, prompt: string) => void;
+  onCopyPrompt: (prompt: string) => void;
+  onImageAction: (action: Exclude<ImageAction, 'copy'>, src: string, prompt: string) => void;
+  prompt: string;
 }) {
   const variant = getActiveVariant(msg);
   const variants = getVariants(msg);
@@ -154,10 +174,12 @@ const MessageBubble = memo(function MessageBubble({
                 imageId={variant.imageId}
                 imageBase64={variant.imageBase64}
                 size={variant.size}
-                prompt=""
+                prompt={prompt}
                 timestamp={variant.timestamp}
                 onEdit={onEdit}
-                onFullscreen={(src) => onFullscreen(src, '')}
+                onFullscreen={(src) => onFullscreen(src, prompt)}
+                onCopyPrompt={prompt ? () => onCopyPrompt(prompt) : undefined}
+                onAction={(action, src) => onImageAction(action, src, prompt)}
               />
             </div>
           )}
@@ -282,7 +304,10 @@ export default function Chat() {
     if (state.images?.length && !autoSentRef.current && !stateImagesAppliedRef.current) {
       stateImagesAppliedRef.current = true;
       inputRef.current?.setImages(state.images);
-      if (!state.autoSend) inputRef.current?.textInput?.focus();
+      if (!state.autoSend) {
+        if (state.prompt) inputRef.current?.setText(state.prompt);
+        inputRef.current?.textInput?.focus();
+      }
     }
     if (state.autoSend && state.prompt && !autoSentRef.current) {
       autoSentRef.current = true;
@@ -318,6 +343,7 @@ export default function Chat() {
     const provider = config?.providers.find((item) => item.id === data.providerId)
       || config?.providers.find((item) => item.id === config.defaultProviderId)
       || config?.providers[0];
+    const startedAt = performance.now();
     let ctrl: AbortController | null = null;
 
     const updatedConv = { ...conversation };
@@ -325,6 +351,7 @@ export default function Chat() {
       role: 'user' as const,
       text: data.prompt,
       generationPrompt: data.generationPrompt,
+      imageDataUrls: data.images?.length ? data.images : undefined,
       imageDataUrl: data.images?.length ? data.images[0] : undefined,
       timestamp: Date.now(),
     }];
@@ -380,9 +407,24 @@ export default function Chat() {
       }];
       setConversation(finalConv);
       await convStore.save(finalConv);
+      recordGenerationOutcome({
+        providerId: provider?.id || data.providerId || 'unknown',
+        providerName: provider?.name,
+        model: provider?.model,
+        ok: true,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       const message = err instanceof Error ? err.message : 'Generation failed';
+      recordGenerationOutcome({
+        providerId: provider?.id || data.providerId || 'unknown',
+        providerName: provider?.name,
+        model: provider?.model,
+        ok: false,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: message,
+      });
       toast.show(message, { type: 'error' });
       const errConv = { ...updatedConv };
       errConv.messages = [...errConv.messages, {
@@ -420,17 +462,21 @@ export default function Chat() {
     setShowStream(true);
     scrollToBottom();
     let ctrl: AbortController | null = null;
+    let retryProviderId = '';
+    let retryProvider = config?.providers.find((provider) => provider.id === config.defaultProviderId)
+      || config?.providers[0];
+    const startedAt = performance.now();
 
     try {
-      const refImages = userMsg.imageDataUrl ? [userMsg.imageDataUrl] : [];
+      const refImages = getReferenceImages(userMsg);
       const activeVariant = getActiveVariant(msg);
       const retrySize = activeVariant?.size || 'auto';
       const thinkingLevel = inputRef.current?.getThinking() || 'low';
-      const retryProviderId = activeVariant?.providerId
+      retryProviderId = activeVariant?.providerId
         || inputRef.current?.getProviderId()
         || config?.defaultProviderId
         || '';
-      const retryProvider = config?.providers.find((provider) => provider.id === retryProviderId)
+      retryProvider = config?.providers.find((provider) => provider.id === retryProviderId)
         || config?.providers.find((provider) => provider.id === config.defaultProviderId)
         || config?.providers[0];
 
@@ -499,9 +545,24 @@ export default function Chat() {
       }
       setConversation(updatedConv);
       await convStore.save(updatedConv);
+      recordGenerationOutcome({
+        providerId: retryProvider?.id || retryProviderId || 'unknown',
+        providerName: retryProvider?.name,
+        model: retryProvider?.model,
+        ok: true,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       const message = err instanceof Error ? err.message : 'Retry failed';
+      recordGenerationOutcome({
+        providerId: retryProvider?.id || retryProviderId || 'unknown',
+        providerName: retryProvider?.name,
+        model: retryProvider?.model,
+        ok: false,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: message,
+      });
       toast.show(message, { type: 'error' });
     } finally {
       if (abortRef.current === ctrl) abortRef.current = null;
@@ -523,6 +584,7 @@ export default function Chat() {
     msg.activeVariant = Math.max(0, Math.min(variants.length - 1, current + direction));
     updatedConv.messages[msgIdx] = msg;
     setConversation(updatedConv);
+    void convStore.save(updatedConv);
   }
 
   const handleEdit = useCallback((src: string) => {
@@ -534,22 +596,52 @@ export default function Chat() {
     openLightbox(src, { prompt });
   }, [openLightbox]);
 
+  const handleCopyPrompt = useCallback(async (prompt: string) => {
+    const value = prompt.trim();
+    if (!value) return;
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
+      toast.show('Prompt copied', { type: 'success' });
+    } catch {
+      toast.show('Unable to copy prompt', { type: 'error' });
+    }
+  }, [toast]);
+
+  const handleImageAction = useCallback((action: Exclude<ImageAction, 'copy'>, src: string, prompt: string) => {
+    inputRef.current?.setImages([src]);
+    inputRef.current?.setText(buildImageActionPrompt(action, prompt));
+    inputRef.current?.textInput?.focus();
+  }, []);
+
   return (
     <>
       <Header activeTab="create" showNewChat />
       <div className="chat-messages" ref={messagesRef}>
         {conversation?.messages.map((msg, i) => {
           if (msg.role === 'user') {
+            const referenceImages = getReferenceImages(msg);
             return (
               <div key={i} className="message message-user">
                 <div className="prompt-card">
                   <div className="prompt-card-header">
                     <span>Prompt</span>
-                    {msg.imageDataUrl && <span>Reference attached</span>}
+                    {referenceImages.length > 0 && (
+                      <span>{referenceImages.length === 1 ? 'Reference attached' : `${referenceImages.length} references attached`}</span>
+                    )}
                   </div>
-                  {msg.imageDataUrl ? (
+                  {referenceImages.length > 0 ? (
                     <div className="prompt-card-body has-reference">
-                      <img src={msg.imageDataUrl} className="prompt-reference-thumb" alt="" />
+                      <div className="prompt-reference-thumbs">
+                        {referenceImages.map((src, idx) => (
+                          <img
+                            key={`${idx}-${src.slice(0, 24)}`}
+                            src={src}
+                            className="prompt-reference-thumb"
+                            alt=""
+                          />
+                        ))}
+                      </div>
                       <div className="prompt-text">{msg.text}</div>
                     </div>
                   ) : (
@@ -569,6 +661,7 @@ export default function Chat() {
               );
             }
 
+            const userPrompt = findPreviousUser(conversation.messages, i)?.text || '';
             return (
               <MessageBubble
                 key={i}
@@ -580,6 +673,9 @@ export default function Chat() {
                 onVariantChange={handleVariantChange}
                 onEdit={handleEdit}
                 onFullscreen={handleFullscreen}
+                onCopyPrompt={handleCopyPrompt}
+                onImageAction={handleImageAction}
+                prompt={userPrompt}
               />
             );
           }

@@ -7,8 +7,11 @@ Pichat 是一个纯前端的 AI 对话生图应用。它可以连接任意 OpenA
 - 图片参考：上传参考图，引导模型编辑或重绘
 - 多尺寸生成：支持 Auto、常用比例、2K / 4K 等尺寸选项
 - 变体切换：同一轮对话可多次重试并保留不同结果
-- 画廊与历史：集中浏览作品，回到任意历史对话
-- 瀑布流模式：适合批量生成和连续探索
+- 画廊与历史：集中浏览作品，支持收藏、标签、筛选与对比
+- 瀑布流模式：支持标准 / 探索矩阵、分支生成、整批保存
+- Prompt 模板：可快速套用常用提示词骨架
+- 数据导入导出：可备份本地配置、会话、图片与元数据
+- Provider 统计：可查看各模型的成功率与耗时概览
 - Thinking 显示：可选展示模型推理摘要
 - 明暗主题：内置浅色 / 深色主题切换
 
@@ -76,6 +79,9 @@ POST /responses
 Pichat 不提供服务端存储，数据保存在浏览器本地：
 
 - `localStorage["gpt2image_config"]`：保存 API Base URL、API Key、模型和偏好设置
+- `localStorage["pichat_prompt_templates"]`：保存自定义 Prompt 模板
+- `localStorage["pichat_gallery_meta"]`：保存画廊收藏与标签
+- `localStorage["pichat_provider_stats"]`：保存 Provider 生成统计
 - IndexedDB `gpt2image`：保存对话、生成图片 Blob 和缩略图
 
 清除浏览器站点数据会删除配置、历史对话和图片。

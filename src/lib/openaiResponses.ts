@@ -90,14 +90,19 @@ function parseResponseOutput(output: ResponseOutputItem[] | undefined): ParsedOu
   return { text, imageBase64, thinking };
 }
 
+function getMessageImageUrls(msg: Message): string[] {
+  if (msg.imageDataUrls?.length) return msg.imageDataUrls;
+  return msg.imageDataUrl ? [msg.imageDataUrl] : [];
+}
+
 function buildInput(prompt: string, images: string[], history: Message[]): InputMessage[] {
   const input: InputMessage[] = [];
 
   for (const msg of history) {
     if (msg.role === 'user') {
       const content: InputMessage['content'] = [{ type: 'input_text', text: msg.generationPrompt || msg.text || '' }];
-      if (msg.imageDataUrl) {
-        content.push({ type: 'input_image', image_url: msg.imageDataUrl });
+      for (const imageUrl of getMessageImageUrls(msg)) {
+        content.push({ type: 'input_image', image_url: imageUrl });
       }
       input.push({ role: 'user', content });
     } else if (msg.role === 'assistant' && !msg.error) {

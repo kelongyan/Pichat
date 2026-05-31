@@ -29,6 +29,7 @@ export interface Message {
   role: 'user' | 'assistant';
   text?: string;
   generationPrompt?: string;
+  imageDataUrls?: string[];
   imageDataUrl?: string;
   variants?: Variant[];
   activeVariant?: number;
@@ -53,6 +54,7 @@ export interface Variant {
 }
 
 export interface GalleryImage {
+  id?: string;
   imageId?: string;
   imageBase64?: string;
   size: string;

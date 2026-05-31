@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, X } from 'lucide-react';
+import { BarChart3, Download, FileText, Plus, Trash2, Upload, X } from 'lucide-react';
 function GithubIcon({ size = 24 }: { size?: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -11,6 +11,9 @@ function GithubIcon({ size = 24 }: { size?: number }) {
 import { Header } from '../components/Header';
 import { useToast } from '../components/Toast';
 import { generateId, useConfigStore } from '../lib/store';
+import { downloadJsonFile, exportPichatData, importPichatData, type PichatExportData } from '../lib/dataTransfer';
+import { loadCustomPromptTemplates, saveCustomPromptTemplates, type PromptTemplate } from '../lib/promptTemplates';
+import { loadProviderStats, summarizeProviderStats, type ProviderStatsSummary } from '../lib/providerStats';
 import type { Config, ProviderConfig } from '../types';
 
 const GITHUB_URL = 'https://github.com/kelongyan/Pichat';
@@ -233,6 +236,7 @@ function FullSettings({ config }: { config: Config }) {
   const navigate = useNavigate();
   const { show: showToast } = useToast();
   const saveConfig = useConfigStore((s) => s.save);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [providers, setProviders] = useState<ProviderConfig[]>(
     config.providers.length ? config.providers : [createProvider('Default')],
@@ -243,6 +247,10 @@ function FullSettings({ config }: { config: Config }) {
   const [showThinking, setShowThinking] = useState(!!config.showThinking);
   const [useSystemPrompt, setUseSystemPrompt] = useState(config.useSystemPrompt !== false);
   const [testingId, setTestingId] = useState('');
+  const [templates, setTemplates] = useState<PromptTemplate[]>(() => loadCustomPromptTemplates());
+  const [providerStats, setProviderStats] = useState<ProviderStatsSummary[]>(() => (
+    summarizeProviderStats(loadProviderStats())
+  ));
 
   function updateProvider(id: string, patch: Partial<ProviderConfig>) {
     setProviders((items) => items.map((provider) => (
@@ -254,6 +262,69 @@ function FullSettings({ config }: { config: Config }) {
     const provider = createProvider(`Provider ${providers.length + 1}`);
     setProviders((items) => [...items, provider]);
     if (!defaultProviderId) setDefaultProviderId(provider.id);
+  }
+
+  function updateTemplate(id: string, patch: Partial<PromptTemplate>) {
+    setTemplates((items) => items.map((template) => (
+      template.id === id ? { ...template, ...patch, updatedAt: Date.now() } : template
+    )));
+  }
+
+  function handleAddTemplate() {
+    const now = Date.now();
+    setTemplates((items) => [...items, {
+      id: generateId(),
+      name: `Template ${items.length + 1}`,
+      template: '{prompt}, polished composition, refined lighting, no watermark.',
+      createdAt: now,
+      updatedAt: now,
+    }]);
+  }
+
+  function handleRemoveTemplate(id: string) {
+    setTemplates((items) => items.filter((template) => template.id !== id));
+  }
+
+  function handleSaveTemplates() {
+    saveCustomPromptTemplates(templates);
+    setTemplates(loadCustomPromptTemplates());
+    showToast('Prompt templates saved', { type: 'success' });
+  }
+
+  function refreshProviderStats() {
+    setProviderStats(summarizeProviderStats(loadProviderStats()));
+  }
+
+  async function handleExportData() {
+    try {
+      const data = await exportPichatData();
+      const date = new Date().toISOString().slice(0, 10);
+      downloadJsonFile(`pichat-export-${date}.json`, data);
+      showToast('Export file prepared', { type: 'success' });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Export failed', { type: 'error' });
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text()) as PichatExportData;
+      await importPichatData(data);
+      if (data.config) {
+        setProviders(data.config.providers);
+        setDefaultProviderId(data.config.defaultProviderId);
+        setShowThinking(data.config.showThinking);
+        setUseSystemPrompt(data.config.useSystemPrompt !== false);
+      }
+      setTemplates(loadCustomPromptTemplates());
+      refreshProviderStats();
+      showToast('Import complete', { type: 'success' });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Import failed', { type: 'error' });
+    }
   }
 
   function handleRemoveProvider(id: string) {
@@ -473,6 +544,91 @@ function FullSettings({ config }: { config: Config }) {
               <span className="toggle-slider" />
             </label>
           </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">PROMPT TEMPLATES</div>
+          <div className="template-list">
+            {templates.map((template) => (
+              <div key={template.id} className="template-card">
+                <div className="template-card-header">
+                  <FileText size={15} />
+                  <input
+                    className="form-input"
+                    value={template.name}
+                    onChange={(e) => updateTemplate(template.id, { name: e.target.value })}
+                    placeholder="Template name"
+                  />
+                  <button
+                    className="provider-icon-btn"
+                    type="button"
+                    title="Remove template"
+                    onClick={() => handleRemoveTemplate(template.id)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <textarea
+                  className="form-input template-textarea"
+                  value={template.template}
+                  onChange={(e) => updateTemplate(template.id, { template: e.target.value })}
+                  placeholder="Use {prompt} where the user's prompt should be inserted"
+                  rows={3}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="settings-action-row">
+            <button className="settings-secondary-btn" type="button" onClick={handleAddTemplate}>
+              <Plus size={16} /> <span>Add Template</span>
+            </button>
+            <button className="settings-secondary-btn" type="button" onClick={handleSaveTemplates}>
+              <FileText size={16} /> <span>Save Templates</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">DATA</div>
+          <div className="settings-action-row">
+            <button className="settings-secondary-btn" type="button" onClick={handleExportData}>
+              <Download size={16} /> <span>Export Data</span>
+            </button>
+            <button className="settings-secondary-btn" type="button" onClick={() => importInputRef.current?.click()}>
+              <Upload size={16} /> <span>Import Data</span>
+            </button>
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">PROVIDER STATS</div>
+          <div className="provider-stats-list">
+            {providerStats.length === 0 ? (
+              <div className="provider-stats-empty">No generation stats yet</div>
+            ) : providerStats.map((stat) => (
+              <div key={stat.providerId} className="provider-stat-card">
+                <div>
+                  <div className="provider-card-title">{stat.providerName || stat.providerId}</div>
+                  <div className="provider-card-meta">{stat.model || 'Model unknown'}</div>
+                </div>
+                <div className="provider-stat-metrics">
+                  <span>{Math.round(stat.successRate * 100)}% success</span>
+                  <span>{stat.avgDurationMs}ms avg</span>
+                  <span>{stat.total} runs</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button className="settings-secondary-btn" type="button" onClick={refreshProviderStats}>
+            <BarChart3 size={16} /> <span>Refresh Stats</span>
+          </button>
         </div>
 
         <button

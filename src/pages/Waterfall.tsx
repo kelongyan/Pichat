@@ -8,9 +8,12 @@ import { useToast } from '../components/Toast';
 import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
 import { useConfigStore, useConversationStore, generateId } from '../lib/store';
-import { saveImage, getImageURL, getImageBlob, revokeAll } from '../lib/imageStore';
+import { saveImage, getImageURL, getImageBlob, getImageBase64, revokeAll } from '../lib/imageStore';
 import { buildImageFilename } from '../lib/filename';
-import { ChevronDown, Download, Save, Maximize2, RefreshCw, Play, Square } from 'lucide-react';
+import { buildWaterfallPrompt, getExplorationSeed, orderWaterfallCards, type WaterfallMode } from '../lib/waterfallExplorer';
+import { recordGenerationOutcome } from '../lib/providerStats';
+import { ChevronDown, Download, Save, Maximize2, RefreshCw, Play, Square, Pin, GitBranch } from 'lucide-react';
+import type { Config, ProviderConfig } from '../types';
 
 const TIER_PRESETS = [
   { value: 1, label: '1' },
@@ -34,6 +37,9 @@ interface WaterfallCard {
   id: string;
   state: 'loading' | 'image' | 'text' | 'error';
   aspectRatio: string;
+  prompt: string;
+  generationPrompt: string;
+  seedLabel?: string;
   imageBase64?: string;
   imageId?: string;
   imageUrl?: string;
@@ -43,6 +49,13 @@ interface WaterfallCard {
   streamThinking?: string;
   streamImage?: string;
   saved?: boolean;
+  pinned?: boolean;
+}
+
+function resolveProvider(config: Config | null | undefined, providerId: string): ProviderConfig | undefined {
+  return config?.providers.find((item) => item.id === providerId)
+    || config?.providers.find((item) => item.id === config.defaultProviderId)
+    || config?.providers[0];
 }
 
 export default function Waterfall() {
@@ -56,11 +69,12 @@ export default function Waterfall() {
   const [currentSize, setCurrentSize] = useState('auto');
   const [currentThinking, setCurrentThinking] = useState('');
   const [currentProviderId, setCurrentProviderId] = useState('');
+  const [waterfallMode, setWaterfallMode] = useState<WaterfallMode>('standard');
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const cardMapRef = useRef(new Map<string, WaterfallCard>());
   const [cardVersion, setCardVersion] = useState(0);
-  const cards = Array.from(cardMapRef.current.values());
+  const cards = orderWaterfallCards(Array.from(cardMapRef.current.values()));
   const [tierOpen, setTierOpen] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -90,6 +104,8 @@ export default function Waterfall() {
   const currentTierRef = useRef(5);
   const currentImagesRef = useRef<string[]>([]);
   const currentGenerationPromptRef = useRef('');
+  const currentModeRef = useRef<WaterfallMode>('standard');
+  const configRef = useRef<Config | null>(config);
 
   useEffect(() => {
     if (!tierOpen) return;
@@ -103,6 +119,8 @@ export default function Waterfall() {
   useEffect(() => { currentThinkingRef.current = currentThinking; }, [currentThinking]);
   useEffect(() => { currentProviderIdRef.current = currentProviderId; }, [currentProviderId]);
   useEffect(() => { currentTierRef.current = currentTier; }, [currentTier]);
+  useEffect(() => { currentModeRef.current = waterfallMode; }, [waterfallMode]);
+  useEffect(() => { configRef.current = config; }, [config]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
   useEffect(() => {
@@ -126,12 +144,16 @@ export default function Waterfall() {
     activeRequestsRef.current++;
     const controller = new AbortController();
     abortControllersRef.current.push(controller);
+    const cardAtStart = cardMapRef.current.get(cardId);
+    const provider = resolveProvider(configRef.current, currentProviderIdRef.current);
+    const providerId = currentProviderIdRef.current || provider?.id || '';
+    const startedAt = performance.now();
 
     generateImage({
-      prompt: currentGenerationPromptRef.current || currentPromptRef.current,
+      prompt: cardAtStart?.generationPrompt || currentGenerationPromptRef.current || currentPromptRef.current,
       size: currentSizeRef.current,
       thinking: currentThinkingRef.current,
-      providerId: currentProviderIdRef.current,
+      providerId,
       action: currentImagesRef.current.length ? 'edit' : 'auto',
       images: currentImagesRef.current,
       signal: controller.signal,
@@ -166,15 +188,33 @@ export default function Waterfall() {
             setCardVersion((v) => v + 1);
           }
         }
+        recordGenerationOutcome({
+          providerId: provider?.id || providerId || 'unknown',
+          providerName: provider?.name,
+          model: provider?.model,
+          ok: true,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
       })
-      .catch((err) => {
-        if (err.name === 'AbortError') {
+      .catch((err: unknown) => {
+        const isAbort = err instanceof DOMException && err.name === 'AbortError'
+          || err instanceof Error && err.name === 'AbortError';
+        if (isAbort) {
           cardMapRef.current.delete(cardId);
           setCardVersion((v) => v + 1);
         } else {
+          const message = err instanceof Error ? err.message : 'Generation failed';
+          recordGenerationOutcome({
+            providerId: provider?.id || providerId || 'unknown',
+            providerName: provider?.name,
+            model: provider?.model,
+            ok: false,
+            durationMs: Math.round(performance.now() - startedAt),
+            error: message,
+          });
           const card = cardMapRef.current.get(cardId);
           if (card) {
-            cardMapRef.current.set(cardId, { ...card, state: 'error', errorMessage: err.message, aspectRatio: '' });
+            cardMapRef.current.set(cardId, { ...card, state: 'error', errorMessage: message, aspectRatio: '' });
             setCardVersion((v) => v + 1);
           }
         }
@@ -220,15 +260,16 @@ export default function Waterfall() {
     if (!prompt || warningBlockRef.current || isPausedRef.current) return;
 
     const tier = currentTierRef.current;
+    const startIndex = sessionCountRef.current;
     const maxPending = Math.max(tier, MAX_CONCURRENT_REQUESTS) * MAX_PENDING_BATCHES;
     const pendingCount = activeRequestsRef.current + queuedCardIdsRef.current.length;
     const batchSize = Math.min(tier, maxPending - pendingCount);
     if (batchSize <= 0) return;
 
-    const nextCount = sessionCountRef.current + batchSize;
+    const nextCount = startIndex + batchSize;
     const thresholds = [tier * 10, tier * 100, tier * 1000];
     for (const t of thresholds) {
-      if (sessionCountRef.current < t && nextCount >= t && !milestoneShownRef.current.has(t)) {
+      if (startIndex < t && nextCount >= t && !milestoneShownRef.current.has(t)) {
         milestoneShownRef.current.add(t);
         sessionCountRef.current = nextCount;
         warningBlockRef.current = true;
@@ -236,12 +277,28 @@ export default function Waterfall() {
         return;
       }
     }
-    sessionCountRef.current += batchSize;
+    sessionCountRef.current = nextCount;
 
     for (let i = 0; i < batchSize; i++) {
       const ratio = ASPECT_RATIOS[Math.floor(Math.random() * ASPECT_RATIOS.length)];
+      const seedIndex = startIndex + i;
+      const mode = currentModeRef.current;
+      const displayPrompt = buildWaterfallPrompt(currentPromptRef.current, mode, seedIndex);
+      const generationPrompt = buildWaterfallPrompt(
+        currentGenerationPromptRef.current || currentPromptRef.current,
+        mode,
+        seedIndex,
+      );
+      const seed = mode === 'matrix' ? getExplorationSeed(seedIndex) : null;
       const id = generateId();
-      cardMapRef.current.set(id, { id, state: 'loading', aspectRatio: ratio });
+      cardMapRef.current.set(id, {
+        id,
+        state: 'loading',
+        aspectRatio: ratio,
+        prompt: displayPrompt,
+        generationPrompt,
+        seedLabel: seed?.label,
+      });
       enqueueCard(id);
     }
     setCardVersion((v) => v + 1);
@@ -277,8 +334,12 @@ export default function Waterfall() {
     setCurrentPrompt(data.prompt.trim());
     currentPromptRef.current = data.prompt.trim();
     currentGenerationPromptRef.current = data.generationPrompt || data.prompt.trim();
-    setCurrentSize(data.size || 'auto');
-    setCurrentThinking(data.thinking || inputRef.current?.getThinking() || '');
+    const nextSize = data.size || 'auto';
+    const nextThinking = data.thinking || inputRef.current?.getThinking() || '';
+    setCurrentSize(nextSize);
+    currentSizeRef.current = nextSize;
+    setCurrentThinking(nextThinking);
+    currentThinkingRef.current = nextThinking;
     setCurrentProviderId(data.providerId || inputRef.current?.getProviderId() || '');
     currentProviderIdRef.current = data.providerId || inputRef.current?.getProviderId() || '';
     currentImagesRef.current = data.images || [];
@@ -323,9 +384,10 @@ export default function Waterfall() {
     inputRef.current?.textInput?.focus();
   }
 
-  async function saveToGallery(imageId: string, prompt: string) {
+  async function saveToGallery(imageId: string, prompt: string, silent = false) {
     const now = Date.now();
     const generationPrompt = currentGenerationPromptRef.current;
+    const imageDataUrls = currentImagesRef.current.length ? [...currentImagesRef.current] : undefined;
     const provider = config?.providers.find((item) => item.id === currentProviderIdRef.current)
       || config?.providers.find((item) => item.id === config.defaultProviderId)
       || config?.providers[0];
@@ -337,6 +399,8 @@ export default function Waterfall() {
           role: 'user' as const,
           text: prompt,
           generationPrompt: generationPrompt && generationPrompt !== prompt ? generationPrompt : undefined,
+          imageDataUrls,
+          imageDataUrl: imageDataUrls?.[0],
           timestamp: now,
         },
         {
@@ -346,7 +410,7 @@ export default function Waterfall() {
             providerId: provider?.id,
             providerName: provider?.name,
             model: provider?.model,
-            size: 'auto',
+            size: currentSizeRef.current || 'auto',
             timestamp: now,
           }],
           activeVariant: 0,
@@ -355,7 +419,7 @@ export default function Waterfall() {
       ],
     };
     await convStore.save(conv);
-    toast.show('Saved to Gallery', { type: 'success' });
+    if (!silent) toast.show('Saved to Gallery', { type: 'success' });
   }
 
   function handleRetryCard(cardId: string) {
@@ -364,6 +428,83 @@ export default function Waterfall() {
     cardMapRef.current.set(cardId, { ...card, state: 'loading', errorMessage: undefined, aspectRatio: '1/1' });
     setCardVersion((v) => v + 1);
     enqueueCard(cardId);
+  }
+
+  function handleTogglePin(cardId: string) {
+    const card = cardMapRef.current.get(cardId);
+    if (!card) return;
+    cardMapRef.current.set(cardId, { ...card, pinned: !card.pinned });
+    setCardVersion((v) => v + 1);
+  }
+
+  async function handleSaveAll() {
+    const savable = cards.filter((card) => card.state === 'image' && card.imageId && !card.saved);
+    if (savable.length === 0) {
+      toast.show('No new images to save');
+      return;
+    }
+    const now = Date.now();
+    const conv = {
+      id: generateId(),
+      createdAt: now,
+      messages: savable.flatMap((card) => ([
+        {
+          role: 'user' as const,
+          text: card.prompt || currentPromptRef.current,
+          generationPrompt: card.generationPrompt || undefined,
+          timestamp: now,
+        },
+        {
+          role: 'assistant' as const,
+          variants: [{
+            imageId: card.imageId,
+            providerId: currentProviderIdRef.current || undefined,
+            providerName: resolveProvider(configRef.current, currentProviderIdRef.current)?.name,
+            model: resolveProvider(configRef.current, currentProviderIdRef.current)?.model,
+            size: currentSizeRef.current || 'auto',
+            timestamp: now,
+          }],
+          activeVariant: 0,
+          timestamp: now,
+        },
+      ])),
+    };
+    await convStore.save(conv);
+    for (const card of savable) {
+      const current = cardMapRef.current.get(card.id);
+      if (current) cardMapRef.current.set(card.id, { ...current, saved: true });
+    }
+    setCardVersion((v) => v + 1);
+    toast.show(`Saved ${savable.length} images to Gallery`, { type: 'success' });
+  }
+
+  async function handleBranchCard(card: WaterfallCard) {
+    let reference = '';
+    if (card.imageId) {
+      const base64 = await getImageBase64(card.imageId);
+      if (base64) reference = `data:image/png;base64,${base64}`;
+    } else if (card.imageBase64) {
+      reference = `data:image/png;base64,${card.imageBase64}`;
+    }
+
+    const branchPrompt = `Create a fresh branch inspired by this result: ${currentPromptRef.current}`;
+    currentPromptRef.current = branchPrompt;
+    currentGenerationPromptRef.current = card.generationPrompt || card.prompt || branchPrompt;
+    currentImagesRef.current = reference ? [reference] : [];
+    sessionCountRef.current = 0;
+    queuedCardIdsRef.current = [];
+    cardMapRef.current.clear();
+    setCurrentPrompt(branchPrompt);
+    setIsPaused(false);
+    isPausedRef.current = false;
+    for (const ctrl of abortControllersRef.current) ctrl.abort();
+    setCardVersion((v) => v + 1);
+    toast.show('Branched into a new waterfall');
+    if (activeRequestsRef.current > 0) {
+      resumeAfterPauseRef.current = true;
+      return;
+    }
+    triggerBatch();
   }
 
   return (
@@ -411,16 +552,40 @@ export default function Waterfall() {
               ))}
             </div>
           </div>
+          <div className="waterfall-mode-toggle" aria-label="Waterfall exploration mode">
+            {(['standard', 'matrix'] as WaterfallMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={waterfallMode === mode ? 'active' : ''}
+                aria-pressed={waterfallMode === mode}
+                onClick={() => setWaterfallMode(mode)}
+              >
+                {mode === 'standard' ? 'Standard' : 'Matrix'}
+              </button>
+            ))}
+          </div>
           {isActive && (
-            <button
-              className={`waterfall-control-btn${isPaused ? ' paused' : ''}`}
-              type="button"
-              title={isPaused ? 'Resume generation' : 'Pause generation'}
-              onClick={isPaused ? handleResumeGeneration : handlePauseGeneration}
-            >
-              {isPaused ? <Play size={14} fill="currentColor" /> : <Square size={12} fill="currentColor" />}
-              <span>{isPaused ? 'Resume' : 'Pause'}</span>
-            </button>
+            <>
+              <button
+                className="waterfall-control-btn save"
+                type="button"
+                title="Save all images"
+                onClick={handleSaveAll}
+              >
+                <Save size={14} />
+                <span>Save all</span>
+              </button>
+              <button
+                className={`waterfall-control-btn${isPaused ? ' paused' : ''}`}
+                type="button"
+                title={isPaused ? 'Resume generation' : 'Pause generation'}
+                onClick={isPaused ? handleResumeGeneration : handlePauseGeneration}
+              >
+                {isPaused ? <Play size={14} fill="currentColor" /> : <Square size={12} fill="currentColor" />}
+                <span>{isPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+            </>
           )}
         </div>
 
@@ -452,25 +617,36 @@ export default function Waterfall() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`waterfall-card${card.state === 'loading' ? ' loading' : ''}${card.state === 'text' ? ' text-card' : ''}${card.state === 'error' ? ' error-card' : ''}`}
+                  className={`waterfall-card${card.state === 'loading' ? ' loading' : ''}${card.state === 'text' ? ' text-card' : ''}${card.state === 'error' ? ' error-card' : ''}${card.pinned ? ' pinned' : ''}`}
                   style={card.aspectRatio ? { aspectRatio: card.aspectRatio, cursor: card.state === 'image' ? 'pointer' : undefined } : { cursor: card.state === 'image' ? 'pointer' : undefined }}
                   onClick={() => {
                     if (card.state === 'image' && (card.imageUrl || card.imageBase64)) {
                       const src = card.imageUrl || `data:image/png;base64,${card.imageBase64}`;
-                      openLightbox(src, { prompt: currentPrompt });
+                      openLightbox(src, { prompt: card.prompt || currentPrompt });
                     }
                   }}
                 >
+                  {card.seedLabel && <span className="waterfall-seed-badge">{card.seedLabel}</span>}
                   {card.state === 'loading' && null}
 
                   {card.state === 'image' && (card.imageUrl || card.imageBase64) && (
                     <>
                       <img
                         src={card.imageUrl || `data:image/png;base64,${card.imageBase64}`}
-                        alt={currentPrompt}
+                        alt={card.prompt || currentPrompt}
                         loading="lazy"
                       />
                       <div className="waterfall-card-overlay">
+                        <button
+                          className={`waterfall-card-btn${card.pinned ? ' active' : ''}`}
+                          title={card.pinned ? 'Unpin' : 'Pin'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTogglePin(card.id);
+                          }}
+                        >
+                          <Pin size={14} />
+                        </button>
                         <button
                           className="waterfall-card-btn"
                           title="Save to Gallery"
@@ -478,7 +654,7 @@ export default function Waterfall() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (card.imageId) {
-                              saveToGallery(card.imageId, currentPrompt);
+                              saveToGallery(card.imageId, card.prompt || currentPrompt);
                               const c = cardMapRef.current.get(card.id);
                               if (c) {
                                 cardMapRef.current.set(card.id, { ...c, saved: true });
@@ -491,6 +667,16 @@ export default function Waterfall() {
                         </button>
                         <button
                           className="waterfall-card-btn"
+                          title="Branch from this image"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBranchCard(card);
+                          }}
+                        >
+                          <GitBranch size={14} />
+                        </button>
+                        <button
+                          className="waterfall-card-btn"
                           title="Download"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -500,14 +686,14 @@ export default function Waterfall() {
                                 const url = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
                                 a.href = url;
-                                a.download = buildImageFilename(currentPrompt);
+                                a.download = buildImageFilename(card.prompt || currentPrompt);
                                 a.click();
                                 setTimeout(() => URL.revokeObjectURL(url), 1000);
                               });
                             } else if (card.imageBase64) {
                               const a = document.createElement('a');
                               a.href = `data:image/png;base64,${card.imageBase64}`;
-                              a.download = buildImageFilename(currentPrompt);
+                              a.download = buildImageFilename(card.prompt || currentPrompt);
                               a.click();
                             }
                           }}
@@ -520,7 +706,7 @@ export default function Waterfall() {
                           onClick={(e) => {
                             e.stopPropagation();
                             const src = card.imageUrl || `data:image/png;base64,${card.imageBase64}`;
-                            openLightbox(src, { prompt: currentPrompt });
+                            openLightbox(src, { prompt: card.prompt || currentPrompt });
                           }}
                         >
                           <Maximize2 size={14} />

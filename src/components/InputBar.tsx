@@ -5,20 +5,44 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Plus, ArrowUp, ChevronDown, Square } from 'lucide-react';
+import { Plus, ArrowUp, ChevronDown, Square, WandSparkles, FileText } from 'lucide-react';
 import { useConfigStore } from '../lib/store';
 import { compressImage } from '../lib/imageStore';
 import {
   ASPECT_OPTIONS,
-  QUICK_PRESET_OPTIONS,
   RESOLUTION_OPTIONS,
-  applyQuickPresetToPrompt,
-  getQuickPresetDefaults,
   resolveImageSize,
   type ImageAspect,
   type ImageResolution,
-  type QuickPreset,
 } from '../lib/imagePresets';
+import {
+  buildGenerationPrompt,
+  DEFAULT_PROMPT_STUDIO_STATE,
+  getUseCaseDefaults,
+  hasPromptStudioSelections,
+  parsePromptStudioState,
+  PROMPT_STUDIO_STORAGE_KEY,
+  serializePromptStudioState,
+  USE_CASE_OPTIONS,
+  STYLE_OPTIONS,
+  SHOT_OPTIONS,
+  COMPOSITION_OPTIONS,
+  TONE_OPTIONS,
+  MATERIAL_OPTIONS,
+  type PromptStudioState,
+  type StudioUseCase,
+  type StudioStyle,
+  type StudioShot,
+  type StudioComposition,
+  type StudioTone,
+  type StudioMaterial,
+  type StudioOption,
+} from '../lib/promptStudio';
+import {
+  applyPromptTemplate,
+  loadPromptTemplates,
+  type PromptTemplate,
+} from '../lib/promptTemplates';
 import type { ThinkingLevel } from '../types';
 
 export interface SendData {
@@ -54,6 +78,35 @@ const THINKING_PRESETS: { value: ThinkingLevel; label: string }[] = [
   { value: 'xhigh', label: 'xHigh' },
 ];
 
+interface StudioGroupProps<T extends string> {
+  label: string;
+  value: T;
+  options: StudioOption<T>[];
+  onChange: (value: T) => void;
+}
+
+function StudioGroup<T extends string>({ label, value, options, onChange }: StudioGroupProps<T>) {
+  return (
+    <div className="prompt-studio-group">
+      <span className="prompt-studio-label">{label}</span>
+      <div className="prompt-studio-pill-row">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`prompt-studio-pill${value === option.value ? ' active' : ''}`}
+            title={option.title}
+            aria-pressed={value === option.value}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function InputBar(
   {
     placeholder = 'Describe the image you want...',
@@ -71,7 +124,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
 
   const [selectedAspect, setSelectedAspect] = useState<ImageAspect>('auto');
   const [selectedResolution, setSelectedResolution] = useState<ImageResolution>('standard');
-  const [selectedQuickPreset, setSelectedQuickPreset] = useState<QuickPreset>('none');
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
   const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>(
@@ -84,11 +136,19 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const [text, setText] = useState('');
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>(() => loadPromptTemplates());
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [studioState, setStudioState] = useState<PromptStudioState>(() => {
+    if (typeof window === 'undefined') return DEFAULT_PROMPT_STUDIO_STATE;
+    return parsePromptStudioState(window.localStorage.getItem(PROMPT_STUDIO_STORAGE_KEY));
+  });
 
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const providerRef = useRef<HTMLDivElement>(null);
+  const templateRef = useRef<HTMLDivElement>(null);
 
   function getSize() {
     if (selectedAspect === 'custom') {
@@ -115,10 +175,23 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     function handleDocClick(e: MouseEvent) {
       if (thinkingRef.current && !thinkingRef.current.contains(e.target as Node)) setThinkingOpen(false);
       if (providerRef.current && !providerRef.current.contains(e.target as Node)) setProviderOpen(false);
+      if (templateRef.current && !templateRef.current.contains(e.target as Node)) setTemplateOpen(false);
     }
     document.addEventListener('click', handleDocClick);
     return () => document.removeEventListener('click', handleDocClick);
   }, []);
+
+  useEffect(() => {
+    function refreshTemplates() {
+      setPromptTemplates(loadPromptTemplates());
+    }
+    window.addEventListener('focus', refreshTemplates);
+    return () => window.removeEventListener('focus', refreshTemplates);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(PROMPT_STUDIO_STORAGE_KEY, serializePromptStudioState(studioState));
+  }, [studioState]);
 
   useEffect(() => {
     if (providers.length === 0) return;
@@ -143,18 +216,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
 
   function selectAspect(value: ImageAspect) {
     setSelectedAspect(value);
-    if (selectedQuickPreset !== 'none') {
-      setSelectedQuickPreset('none');
-    }
-  }
-
-  function selectQuickPreset(value: Exclude<QuickPreset, 'none'>) {
-    const nextPreset: QuickPreset = selectedQuickPreset === value ? 'none' : value;
-    setSelectedQuickPreset(nextPreset);
-    const defaults = getQuickPresetDefaults(nextPreset);
-    if (defaults.aspect) {
-      setSelectedAspect(defaults.aspect);
-    }
   }
 
   function selectResolution(value: ImageResolution) {
@@ -164,16 +225,35 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     }
   }
 
+  function updateStudioState<K extends keyof PromptStudioState>(key: K, value: PromptStudioState[K]) {
+    setStudioState((prev) => {
+      const next = { ...prev, [key]: value } as PromptStudioState;
+      if (key === 'useCase') {
+        const defaults = getUseCaseDefaults(value as StudioUseCase);
+        if (defaults.aspect) {
+          setSelectedAspect(defaults.aspect);
+        }
+      }
+      return next;
+    });
+  }
+
   function selectProvider(providerId: string) {
     setSelectedProviderId(providerId);
     setProviderOpen(false);
+  }
+
+  function selectTemplate(template: PromptTemplate) {
+    setText((prev) => (prev.trim() ? applyPromptTemplate(prev, template) : template.template));
+    setTemplateOpen(false);
+    requestAnimationFrame(() => textRef.current?.focus());
   }
 
   function doSend() {
     if (isGenerating) return;
     const prompt = text.trim();
     if (!prompt) return;
-    const generationPrompt = applyQuickPresetToPrompt(prompt, selectedQuickPreset);
+    const generationPrompt = buildGenerationPrompt(prompt, studioState);
     onSend({
       prompt,
       generationPrompt: generationPrompt === prompt ? undefined : generationPrompt,
@@ -231,6 +311,49 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   return (
     <div>
       <div className="options-row">
+        <button
+          type="button"
+          className={`studio-toggle${studioOpen ? ' open' : ''}${hasPromptStudioSelections(studioState) ? ' active' : ''}`}
+          onClick={() => setStudioOpen((v) => !v)}
+        >
+          <WandSparkles size={14} />
+          <span>Studio</span>
+        </button>
+        {promptTemplates.length > 0 && (
+          <div className="ghost-dropdown prompt-template-dropdown" ref={templateRef}>
+            <button
+              className={`ghost-dropdown-trigger${templateOpen ? ' open' : ''}`}
+              title="Prompt templates"
+              onClick={(e) => {
+                e.stopPropagation();
+                setTemplateOpen((v) => !v);
+                setProviderOpen(false);
+                setThinkingOpen(false);
+              }}
+            >
+              <FileText size={13} />
+              <span className="ghost-dropdown-prefix">Template</span>
+              <span className="ghost-dropdown-arrow">
+                <ChevronDown size={12} />
+              </span>
+            </button>
+            <div className={`ghost-dropdown-menu${templateOpen ? ' open' : ''}`}>
+              {promptTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className="ghost-dropdown-item"
+                  title={template.template}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectTemplate(template);
+                  }}
+                >
+                  {template.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {selectedProvider && (
           <div className="ghost-dropdown" ref={providerRef}>
             <button
@@ -334,24 +457,48 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
           </div>
         </div>
 
-        <div className="generation-setting-group generation-setting-group-wide">
-          <span className="generation-setting-label">Quick</span>
-          <div className="generation-pill-row">
-            {QUICK_PRESET_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`generation-pill generation-pill-quick${selectedQuickPreset === option.value ? ' active' : ''}`}
-                title={option.title}
-                aria-pressed={selectedQuickPreset === option.value}
-                onClick={() => selectQuickPreset(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
+
+      {studioOpen && (
+        <div className="prompt-studio-panel" aria-label="Prompt Studio">
+          <StudioGroup
+            label="Mode"
+            value={studioState.useCase}
+            options={USE_CASE_OPTIONS}
+            onChange={(value) => updateStudioState('useCase', value)}
+          />
+          <StudioGroup
+            label="Style"
+            value={studioState.style}
+            options={STYLE_OPTIONS}
+            onChange={(value) => updateStudioState('style', value)}
+          />
+          <StudioGroup
+            label="Shot"
+            value={studioState.shot}
+            options={SHOT_OPTIONS}
+            onChange={(value) => updateStudioState('shot', value)}
+          />
+          <StudioGroup
+            label="Composition"
+            value={studioState.composition}
+            options={COMPOSITION_OPTIONS}
+            onChange={(value) => updateStudioState('composition', value)}
+          />
+          <StudioGroup
+            label="Tone"
+            value={studioState.tone}
+            options={TONE_OPTIONS}
+            onChange={(value) => updateStudioState('tone', value)}
+          />
+          <StudioGroup
+            label="Material"
+            value={studioState.material}
+            options={MATERIAL_OPTIONS}
+            onChange={(value) => updateStudioState('material', value)}
+          />
+        </div>
+      )}
 
       {selectedAspect === 'custom' && (
         <div className="size-custom-row" style={{ display: 'flex' }}>
