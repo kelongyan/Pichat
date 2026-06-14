@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Columns2, Image as ImageIcon, Search, Star, Tags, X } from 'lucide-react';
 import { Header } from '../components/Header';
 import { ImageCard } from '../components/ImageCard';
+import { EmptyState } from '../components/EmptyState';
 import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { useConversationStore } from '../lib/store';
-import { getImageURL, getThumbURL, revokeAll, toImageDataUrl } from '../lib/imageStore';
+import { getImageURL, revokeAll, toImageDataUrl } from '../lib/imageStore';
 import { buildImageActionPrompt } from '../lib/imageActions';
+import { copyToClipboard } from '../lib/clipboard';
+import { useLazyImage } from '../hooks/useLazyImage';
 import {
   buildGalleryImageKey,
   filterGalleryImages,
@@ -33,18 +36,9 @@ const DEFAULT_FILTERS: GalleryFilterState = {
 };
 
 function GalleryCompareThumb({ image }: { image: GalleryImage }) {
-  const [src, setSrc] = useState(() => (
-    image.imageBase64 ? toImageDataUrl(image.imageBase64) : ''
-  ));
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!image.imageId) return;
-    getThumbURL(image.imageId).then((url) => {
-      if (!cancelled && url) setSrc(url);
-    });
-    return () => { cancelled = true; };
-  }, [image.imageId]);
+  const thumbSrc = useLazyImage(image.imageId, true);
+  const base64Src = image.imageBase64 ? toImageDataUrl(image.imageBase64) : '';
+  const src = thumbSrc || base64Src;
 
   if (!src) return null;
   return (
@@ -130,15 +124,7 @@ export default function Gallery() {
   }, [navigate]);
 
   const handleCopyPrompt = useCallback(async (prompt: string) => {
-    const value = prompt.trim();
-    if (!value) return;
-    try {
-      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(value);
-      toast.show('Prompt copied', { type: 'success' });
-    } catch {
-      toast.show('Unable to copy prompt', { type: 'error' });
-    }
+    await copyToClipboard(prompt.trim(), toast);
   }, [toast]);
 
   const handleAction = useCallback((action: 'same' | 'style' | 'background' | 'ratio', src: string, img: GalleryImage) => {
@@ -164,15 +150,11 @@ export default function Gallery() {
     <>
       <Header activeTab="gallery" />
       {loaded && images.length === 0 && (
-        <div className="landing fade-in">
-          <div style={{ color: 'var(--text-muted)', fontSize: 48, marginBottom: 16 }}>
-            <ImageIcon size={48} strokeWidth={1} />
-          </div>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: 15 }}>No images yet</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-            Create your first image to see it here
-          </p>
-        </div>
+        <EmptyState
+          icon={<ImageIcon size={48} strokeWidth={1} />}
+          title="No images yet"
+          subtitle="Create your first image to see it here"
+        />
       )}
       {images.length > 0 && (
         <div className="gallery-shell fade-in">

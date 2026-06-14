@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Trash2 } from 'lucide-react';
 import { Header } from '../components/Header';
+import { EmptyState } from '../components/EmptyState';
 import { useConversationStore } from '../lib/store';
-import { getThumbURL, toImageDataUrl } from '../lib/imageStore';
+import { toImageDataUrl } from '../lib/imageStore';
+import { useLazyImage } from '../hooks/useLazyImage';
 import type { Conversation, Message } from '../types';
 
 interface ThumbInfo {
@@ -38,15 +40,9 @@ function formatTime(ts: number): string {
 }
 
 function ThumbImage({ info }: { info: ThumbInfo }) {
-  const [src, setSrc] = useState(() =>
-    info.imageBase64 ? toImageDataUrl(info.imageBase64) : ''
-  );
-
-  useEffect(() => {
-    if (info.imageId) {
-      getThumbURL(info.imageId).then((url) => { if (url) setSrc(url); });
-    }
-  }, [info.imageId]);
+  const thumbSrc = useLazyImage(info.imageId, true);
+  const base64Src = info.imageBase64 ? toImageDataUrl(info.imageBase64) : '';
+  const src = thumbSrc || base64Src;
 
   if (!src) return null;
   return <img src={src} alt="" />;
@@ -63,26 +59,25 @@ export default function History() {
     loadAll().then(() => setLoaded(true));
   }, [loadAll]);
 
-  async function handleDelete(e: React.MouseEvent, conv: Conversation) {
+  const handleDelete = useCallback(async (e: React.MouseEvent, conv: Conversation) => {
     e.stopPropagation();
     await remove(conv.id);
-  }
+  }, [remove]);
 
-  const items = conversations.filter((c) => c.messages.some((m) => m.role === 'user'));
+  const items = useMemo(
+    () => conversations.filter((c) => c.messages.some((m) => m.role === 'user')),
+    [conversations],
+  );
 
   return (
     <>
       <Header activeTab="history" />
       {loaded && items.length === 0 && (
-        <div className="landing fade-in">
-          <div style={{ color: 'var(--text-muted)', fontSize: 48, marginBottom: 16 }}>
-            <Clock size={48} strokeWidth={1} />
-          </div>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: 15 }}>No conversations yet</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-            Start creating to build your history
-          </p>
-        </div>
+        <EmptyState
+          icon={<Clock size={48} strokeWidth={1} />}
+          title="No conversations yet"
+          subtitle="Start creating to build your history"
+        />
       )}
       {loaded && items.length > 0 && (
         <div className="history-list fade-in">

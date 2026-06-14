@@ -1,4 +1,6 @@
-export const PROMPT_TEMPLATES_STORAGE_KEY = 'pichat_prompt_templates';
+import { canUseStorage } from './storage';
+
+const PROMPT_TEMPLATES_STORAGE_KEY = 'pichat_prompt_templates';
 
 export interface PromptTemplate {
   id: string;
@@ -7,45 +9,6 @@ export interface PromptTemplate {
   createdAt: number;
   updatedAt: number;
   builtin?: boolean;
-}
-
-export const DEFAULT_PROMPT_TEMPLATES: PromptTemplate[] = [
-  {
-    id: 'tpl-product',
-    name: 'Product Shot',
-    template: 'Premium product photo of {prompt}, clean background, controlled highlights, tactile materials, no watermark.',
-    createdAt: 1,
-    updatedAt: 1,
-    builtin: true,
-  },
-  {
-    id: 'tpl-poster',
-    name: 'Poster',
-    template: 'Poster-ready image of {prompt}, strong focal point, graphic composition, room for title text if requested.',
-    createdAt: 1,
-    updatedAt: 1,
-    builtin: true,
-  },
-  {
-    id: 'tpl-character',
-    name: 'Character',
-    template: 'Character design of {prompt}, clear silhouette, expressive pose, consistent details, polished concept art finish.',
-    createdAt: 1,
-    updatedAt: 1,
-    builtin: true,
-  },
-  {
-    id: 'tpl-wallpaper',
-    name: 'Wallpaper',
-    template: 'Immersive wallpaper of {prompt}, wide composition, atmospheric depth, no text, no watermark.',
-    createdAt: 1,
-    updatedAt: 1,
-    builtin: true,
-  },
-];
-
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && !!window.localStorage;
 }
 
 function createTemplateId(now = Date.now()): string {
@@ -76,13 +39,13 @@ export function normalizePromptTemplates(raw: unknown, now = Date.now()): Prompt
     .filter((template) => template.template.length > 0);
 }
 
-export function loadPromptTemplates(): PromptTemplate[] {
-  if (!canUseStorage()) return DEFAULT_PROMPT_TEMPLATES;
+export function saveCustomPromptTemplates(templates: PromptTemplate[]): void {
+  if (!canUseStorage()) return;
+  const custom = normalizePromptTemplates(templates).map((template) => ({ ...template, builtin: false }));
   try {
-    const custom = normalizePromptTemplates(JSON.parse(window.localStorage.getItem(PROMPT_TEMPLATES_STORAGE_KEY) || '[]'));
-    return [...DEFAULT_PROMPT_TEMPLATES, ...custom];
+    window.localStorage.setItem(PROMPT_TEMPLATES_STORAGE_KEY, JSON.stringify(custom));
   } catch {
-    return DEFAULT_PROMPT_TEMPLATES;
+    // quota / private mode — ignore write failure
   }
 }
 
@@ -93,20 +56,4 @@ export function loadCustomPromptTemplates(): PromptTemplate[] {
   } catch {
     return [];
   }
-}
-
-export function saveCustomPromptTemplates(templates: PromptTemplate[]): void {
-  if (!canUseStorage()) return;
-  const custom = normalizePromptTemplates(templates).map((template) => ({ ...template, builtin: false }));
-  window.localStorage.setItem(PROMPT_TEMPLATES_STORAGE_KEY, JSON.stringify(custom));
-}
-
-export function applyPromptTemplate(prompt: string, template: PromptTemplate | null | undefined): string {
-  const trimmed = prompt.trim();
-  if (!template || !template.template.trim()) return trimmed;
-  const templateText = template.template.trim();
-  if (templateText.includes('{prompt}')) {
-    return templateText.replace(/\{prompt\}/g, trimmed);
-  }
-  return `${trimmed}\n\n${templateText}`;
 }

@@ -336,25 +336,37 @@ export const useConfigStore = create<ConfigState>((set) => ({
   config: null,
   loaded: false,
   load: () => {
-    const raw = localStorage.getItem(CONFIG_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const config = normalizeConfig(parsed);
-      if (!config) {
+    try {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const config = normalizeConfig(parsed);
+        if (!config) {
+          localStorage.removeItem(CONFIG_KEY);
+          set({ config: null, loaded: true });
+          return;
+        }
+        try {
+          localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        } catch {
+          // quota / private mode — config still usable in memory
+        }
+        set({ config, loaded: true });
+      } else {
         set({ config: null, loaded: true });
-        return;
       }
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-      set({
-        config,
-        loaded: true,
-      });
-    } else {
+    } catch {
+      // corrupt JSON in localStorage — drop it and continue
+      try { localStorage.removeItem(CONFIG_KEY); } catch { /* ignore */ }
       set({ config: null, loaded: true });
     }
   },
   save: (config: Config) => {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    try {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    } catch {
+      // quota / private mode — ignore write failure
+    }
     set({ config });
   },
 }));

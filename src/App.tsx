@@ -38,12 +38,15 @@ export function App() {
   const applyTheme = useThemeStore((s) => s.apply);
 
   useEffect(() => {
+    let cancelled = false;
     initStore().then(() => {
+      if (cancelled) return;
       loadConfig();
       applyTheme();
     });
     preloadSystemPrompt();
-  }, []);
+    return () => { cancelled = true; };
+  }, [loadConfig, applyTheme]);
 
   return (
     <HashRouter>

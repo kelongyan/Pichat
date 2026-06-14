@@ -3,6 +3,7 @@ import { Download, Pencil, Maximize2, Copy, Sparkles } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
 import { getImageURL, getThumbURL, getImageBlob, getImageBase64, toImageDataUrl } from '../lib/imageStore';
 import { getImageActionLabel, type ImageAction } from '../lib/imageActions';
+import { downloadBlob } from '../lib/download';
 
 type CardImageAction = Exclude<ImageAction, 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
 
@@ -43,11 +44,12 @@ export function ImageCard({
   }, [imageBase64]);
 
   useEffect(() => {
-    if (imageId) {
-      const loadUrl = useThumbnail ? getThumbURL : getImageURL;
-      loadUrl(imageId).then((url) => { if (url) setSrc(url); });
-      getImageURL(imageId).then((url) => { if (url) setFullSrc(url); });
-    }
+    if (!imageId) return;
+    let cancelled = false;
+    const loadUrl = useThumbnail ? getThumbURL : getImageURL;
+    loadUrl(imageId).then((url) => { if (!cancelled && url) setSrc(url); });
+    getImageURL(imageId).then((url) => { if (!cancelled && url) setFullSrc(url); });
+    return () => { cancelled = true; };
   }, [imageId, useThumbnail]);
 
   function handleDownload(e: React.MouseEvent) {
@@ -55,12 +57,7 @@ export function ImageCard({
     if (imageId) {
       getImageBlob(imageId).then((blob) => {
         if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = buildImageFilename(prompt, timestamp);
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBlob(buildImageFilename(prompt, timestamp), blob);
       });
     } else {
       const a = document.createElement('a');

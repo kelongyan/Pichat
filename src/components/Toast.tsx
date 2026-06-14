@@ -22,7 +22,7 @@ interface ToastOptions {
   duration?: number;
 }
 
-interface ToastContextValue {
+export interface ToastContextValue {
   show: (message: string, options?: ToastOptions) => void;
 }
 
@@ -37,26 +37,42 @@ export function useToast(): ToastContextValue {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
+  const timersRef = useRef<Map<number, number[]>>(new Map());
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach((ids) => {
+        if (ids[0] !== undefined) cancelAnimationFrame(ids[0]);
+        for (let i = 1; i < ids.length; i++) clearTimeout(ids[i]);
+      });
+      timers.clear();
+    };
+  }, []);
 
   const show = useCallback((message: string, options: ToastOptions = {}) => {
     const { type = 'info', duration = 4000 } = options;
     const id = ++idRef.current;
     setToasts((prev) => [...prev, { id, message, type, show: false }]);
 
-    requestAnimationFrame(() => {
+    const raf = requestAnimationFrame(() => {
       setToasts((prev) =>
         prev.map((t) => (t.id === id ? { ...t, show: true } : t)),
       );
     });
 
-    setTimeout(() => {
+    const hideTimer = window.setTimeout(() => {
       setToasts((prev) =>
         prev.map((t) => (t.id === id ? { ...t, show: false } : t)),
       );
-      setTimeout(() => {
+      const removeTimer = window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
+        timersRef.current.delete(id);
       }, 300);
+      timersRef.current.set(id, [raf, hideTimer, removeTimer]);
     }, duration);
+
+    timersRef.current.set(id, [raf, hideTimer]);
   }, []);
 
   return (

@@ -1,6 +1,6 @@
-import type { Conversation, Message } from '../types.ts';
+import type { Conversation, Message } from '../types';
 
-function cloneConversation(conversation: Conversation): Conversation {
+export function cloneConversation(conversation: Conversation): Conversation {
   return JSON.parse(JSON.stringify(conversation)) as Conversation;
 }
 

@@ -1,8 +1,9 @@
 import type { GalleryImage } from '../types';
+import { canUseStorage } from './storage';
 
-export const GALLERY_META_STORAGE_KEY = 'pichat_gallery_meta';
+const GALLERY_META_STORAGE_KEY = 'pichat_gallery_meta';
 
-export interface GalleryMetaEntry {
+interface GalleryMetaEntry {
   favorite?: boolean;
   tags?: string[];
 }
@@ -16,10 +17,6 @@ export interface GalleryFilterState {
   model: string;
   tag: string;
   sort: 'newest' | 'oldest';
-}
-
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && !!window.localStorage;
 }
 
 export function normalizeTags(tags: string[]): string[] {
@@ -64,7 +61,11 @@ export function loadGalleryMeta(): GalleryMetaMap {
 
 export function saveGalleryMeta(meta: GalleryMetaMap): void {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(GALLERY_META_STORAGE_KEY, JSON.stringify(normalizeGalleryMetaMap(meta)));
+  try {
+    window.localStorage.setItem(GALLERY_META_STORAGE_KEY, JSON.stringify(normalizeGalleryMetaMap(meta)));
+  } catch {
+    // quota / private mode — ignore write failure
+  }
 }
 
 export function toggleGalleryFavorite(meta: GalleryMetaMap, key: string): GalleryMetaMap {

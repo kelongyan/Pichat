@@ -1,4 +1,6 @@
-export const PROVIDER_STATS_STORAGE_KEY = 'pichat_provider_stats';
+import { canUseStorage } from './storage';
+
+const PROVIDER_STATS_STORAGE_KEY = 'pichat_provider_stats';
 
 export interface ProviderStatsEntry {
   providerId: string;
@@ -27,10 +29,6 @@ export interface ProviderOutcome {
 
 export interface ProviderStatsSummary extends ProviderStatsEntry {
   successRate: number;
-}
-
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && !!window.localStorage;
 }
 
 export function normalizeProviderStats(raw: unknown): ProviderStatsMap {
@@ -67,7 +65,11 @@ export function loadProviderStats(): ProviderStatsMap {
 
 export function saveProviderStats(stats: ProviderStatsMap): void {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(PROVIDER_STATS_STORAGE_KEY, JSON.stringify(normalizeProviderStats(stats)));
+  try {
+    window.localStorage.setItem(PROVIDER_STATS_STORAGE_KEY, JSON.stringify(normalizeProviderStats(stats)));
+  } catch {
+    // quota / private mode — ignore write failure
+  }
 }
 
 export function recordProviderOutcome(stats: ProviderStatsMap, outcome: ProviderOutcome): ProviderStatsMap {

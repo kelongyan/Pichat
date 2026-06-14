@@ -231,7 +231,17 @@ function FullSettings({ config }: { config: Config }) {
     e.target.value = '';
     if (!file) return;
     try {
-      const data = JSON.parse(await file.text()) as PichatExportData;
+      const raw = JSON.parse(await file.text());
+      if (!raw || typeof raw !== 'object' || raw.version !== 1) {
+        throw new Error('Unsupported Pichat export file');
+      }
+      if (!Array.isArray(raw.conversations)) {
+        throw new Error('Invalid export file: missing conversations');
+      }
+      if (raw.config && !Array.isArray(raw.config.providers)) {
+        throw new Error('Invalid export file: config.providers must be an array');
+      }
+      const data = raw as PichatExportData;
       await importPichatData(data);
       if (data.config) { setProviders(data.config.providers); setDefaultProviderId(data.config.defaultProviderId); setShowThinking(data.config.showThinking); setUseSystemPrompt(data.config.useSystemPrompt !== false); }
       setTemplates(loadCustomPromptTemplates());

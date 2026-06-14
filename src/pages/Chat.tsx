@@ -6,14 +6,14 @@ import type { InputBarHandle, SendData } from '../components/InputBar';
 import { ImageCard } from '../components/ImageCard';
 import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
-import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
 import { saveImage, toImageDataUrl } from '../lib/imageStore';
 import { useConfigStore, useConversationStore, generateId } from '../lib/store';
 import { buildImageActionPrompt, type ImageAction } from '../lib/imageActions';
 import { recordGenerationOutcome } from '../lib/providerStats';
+import { copyToClipboard } from '../lib/clipboard';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Conversation, Message, Variant } from '../types';
+import type { Conversation, Message, ProviderConfig, Variant } from '../types';
 
 function getVariants(msg: Message): Variant[] {
   if (msg.variants) return msg.variants;
@@ -47,7 +47,7 @@ interface StreamState {
 }
 
 // Isolated streaming bubble — owns its own render cycle
-function StreamBubble({ streamRef, showThinking }: { streamRef: React.RefObject<StreamState | null>; showThinking: boolean }) {
+function StreamBubble({ streamRef }: { streamRef: React.RefObject<StreamState | null> }) {
   const [state, setState] = useState<StreamState | null>(null);
   const rafRef = useRef(0);
 
@@ -99,7 +99,6 @@ const MessageBubble = memo(function MessageBubble({
   msg,
   index,
   isGenerating,
-  showThinking,
   onRetry,
   onVariantChange,
   onEdit,
@@ -111,7 +110,6 @@ const MessageBubble = memo(function MessageBubble({
   msg: Message;
   index: number;
   isGenerating: boolean;
-  showThinking: boolean;
   onRetry: (idx: number) => void;
   onVariantChange: (idx: number, dir: -1 | 1) => void;
   onEdit: (src: string) => void;
@@ -123,7 +121,6 @@ const MessageBubble = memo(function MessageBubble({
   const variant = getActiveVariant(msg);
   const variants = getVariants(msg);
   const hasImage = !!(variant?.imageId || variant?.imageBase64);
-  const hasText = !!variant?.text;
 
   return (
     <div className="message message-ai">
@@ -216,7 +213,6 @@ export default function Chat() {
     prompt?: string;
     generationPrompt?: string;
     size?: string;
-    thinking?: string;
     providerId?: string;
     images?: string[];
     autoSend?: boolean;
@@ -306,14 +302,108 @@ export default function Chat() {
     return el.scrollHeight - el.scrollTop - el.clientHeight < 100;
   }
 
+  async function runGeneration(args: {
+    prompt: string;
+    size?: string;
+    providerId: string;
+    provider: ProviderConfig | undefined;
+    action: string;
+    images: string[];
+    history: Message[];
+    errorTarget: Conversation;
+  }): Promise<{ variant: Variant } | null> {
+    if (isGenerating) return null;
+    setIsGenerating(true);
+    const startedAt = performance.now();
+    streamRef.current = { text: null, thinking: null, imageBase64: null, done: false };
+    setShowStream(true);
+    scrollToBottom();
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    try {
+      const result = await generateImage({
+        prompt: args.prompt,
+        size: args.size,
+        thinking: config?.thinkingLevel || 'low',
+        providerId: args.providerId,
+        action: args.action,
+        images: args.images,
+        history: args.history,
+        signal: ctrl.signal,
+        onStream: (delta) => {
+          streamRef.current = {
+            text: delta.text,
+            thinking: delta.thinking,
+            imageBase64: delta.imageBase64,
+            done: !!delta.done,
+          };
+          if (isNearBottom()) scrollToBottom();
+        },
+      });
+      if (ctrl.signal.aborted) return null;
+
+      const imageId = result.imageBase64 ? await saveImage(result.imageBase64) : undefined;
+      if (ctrl.signal.aborted) return null;
+
+      recordGenerationOutcome({
+        providerId: args.provider?.id || args.providerId || 'unknown',
+        providerName: args.provider?.name,
+        model: args.provider?.model,
+        ok: true,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+
+      return {
+        variant: {
+          text: result.text || undefined,
+          imageId,
+          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
+          thinking: result.thinking || undefined,
+          providerId: args.provider?.id,
+          providerName: args.provider?.name,
+          model: args.provider?.model,
+          size: args.size || 'auto',
+          timestamp: Date.now(),
+        },
+      };
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return null;
+      const message = err instanceof Error ? err.message : 'Generation failed';
+      recordGenerationOutcome({
+        providerId: args.provider?.id || args.providerId || 'unknown',
+        providerName: args.provider?.name,
+        model: args.provider?.model,
+        ok: false,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: message,
+      });
+      toast.show(message, { type: 'error' });
+      const errConv = { ...args.errorTarget };
+      errConv.messages = [...errConv.messages, {
+        role: 'assistant' as const,
+        error: message,
+        timestamp: Date.now(),
+      }];
+      setConversation(errConv);
+      await convStore.save(errConv);
+      return null;
+    } finally {
+      if (abortRef.current === ctrl) abortRef.current = null;
+      streamRef.current = null;
+      setShowStream(false);
+      setIsGenerating(false);
+      setRetryingIdx(-1);
+      scrollToBottom();
+    }
+  }
+
   async function handleSend(data: SendData) {
     if (isGenerating || !conversation) return;
-    setIsGenerating(true);
     const provider = config?.providers.find((item) => item.id === data.providerId)
       || config?.providers.find((item) => item.id === config.defaultProviderId)
       || config?.providers[0];
-    const startedAt = performance.now();
-    let ctrl: AbortController | null = null;
 
     const updatedConv = { ...conversation };
     updatedConv.messages = [...updatedConv.messages, {
@@ -328,96 +418,33 @@ export default function Chat() {
     await convStore.save(updatedConv);
     scrollToBottom();
 
-    streamRef.current = { text: null, thinking: null, imageBase64: null, done: false };
-    setShowStream(true);
-    scrollToBottom();
+    const historyMessages = updatedConv.messages.slice(0, -1);
+    const result = await runGeneration({
+      prompt: data.generationPrompt || data.prompt,
+      size: data.size,
+      providerId: data.providerId,
+      provider,
+      action: data.images?.length ? 'edit' : 'auto',
+      images: data.images || [],
+      history: historyMessages,
+      errorTarget: updatedConv,
+    });
+    if (!result) return;
 
-    try {
-      ctrl = new AbortController();
-      abortRef.current = ctrl;
-      const historyMessages = updatedConv.messages.slice(0, -1);
-      const result = await generateImage({
-        prompt: data.generationPrompt || data.prompt,
-        size: data.size,
-        thinking: 'low',
-        providerId: data.providerId,
-        action: data.images?.length ? 'edit' : 'generate',
-        images: data.images || [],
-        history: historyMessages,
-        signal: ctrl.signal,
-        onStream: (delta) => {
-          streamRef.current = { text: delta.text, thinking: delta.thinking, imageBase64: delta.imageBase64, done: !!delta.done };
-          if (isNearBottom()) scrollToBottom();
-        },
-      });
-      if (ctrl.signal.aborted) return;
-
-      let imageId: string | undefined;
-      if (result.imageBase64) {
-        imageId = await saveImage(result.imageBase64);
-      } else {
-        imageId = undefined;
-      }
-      if (ctrl.signal.aborted) return;
-
-      const finalConv = { ...updatedConv };
-      finalConv.messages = [...finalConv.messages, {
-        role: 'assistant' as const,
-        variants: [{
-          text: result.text || undefined,
-          imageId,
-          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
-          thinking: result.thinking || undefined,
-          providerId: provider?.id,
-          providerName: provider?.name,
-          model: provider?.model,
-          size: data.size,
-          timestamp: Date.now(),
-        }],
-        activeVariant: 0,
-        timestamp: Date.now(),
-      }];
-      setConversation(finalConv);
-      await convStore.save(finalConv);
-      recordGenerationOutcome({
-        providerId: provider?.id || data.providerId || 'unknown',
-        providerName: provider?.name,
-        model: provider?.model,
-        ok: true,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      const message = err instanceof Error ? err.message : 'Generation failed';
-      recordGenerationOutcome({
-        providerId: provider?.id || data.providerId || 'unknown',
-        providerName: provider?.name,
-        model: provider?.model,
-        ok: false,
-        durationMs: Math.round(performance.now() - startedAt),
-        error: message,
-      });
-      toast.show(message, { type: 'error' });
-      const errConv = { ...updatedConv };
-      errConv.messages = [...errConv.messages, {
-        role: 'assistant' as const,
-        error: message,
-        timestamp: Date.now(),
-      }];
-      setConversation(errConv);
-      await convStore.save(errConv);
-    } finally {
-      if (abortRef.current === ctrl) abortRef.current = null;
-      streamRef.current = null;
-      setShowStream(false);
-      setIsGenerating(false);
-      scrollToBottom();
-    }
+    const finalConv = { ...updatedConv };
+    finalConv.messages = [...finalConv.messages, {
+      role: 'assistant' as const,
+      variants: [result.variant],
+      activeVariant: 0,
+      timestamp: Date.now(),
+    }];
+    setConversation(finalConv);
+    await convStore.save(finalConv);
   }
 
   handleSendRef.current = handleSend;
 
-  async function handleRetry(msgIdx: number) {
+  const handleRetry = useCallback(async (msgIdx: number) => {
     if (isGenerating || !conversation) return;
     const msg = conversation.messages[msgIdx];
 
@@ -427,129 +454,59 @@ export default function Chat() {
     }
     if (!userMsg) return;
 
-    setIsGenerating(true);
     setRetryingIdx(msgIdx);
 
-    streamRef.current = { text: null, thinking: null, imageBase64: null, done: false };
-    setShowStream(true);
-    scrollToBottom();
-    let ctrl: AbortController | null = null;
-    let retryProviderId = '';
-    let retryProvider = config?.providers.find((provider) => provider.id === config.defaultProviderId)
+    const refImages = getReferenceImages(userMsg);
+    const activeVariant = getActiveVariant(msg);
+    const retrySize = activeVariant?.size || 'auto';
+    const retryProviderId = activeVariant?.providerId
+      || inputRef.current?.getProviderId()
+      || config?.defaultProviderId
+      || '';
+    const retryProvider = config?.providers.find((provider) => provider.id === retryProviderId)
+      || config?.providers.find((provider) => provider.id === config.defaultProviderId)
       || config?.providers[0];
-    const startedAt = performance.now();
 
-    try {
-      const refImages = getReferenceImages(userMsg);
-      const activeVariant = getActiveVariant(msg);
-      const retrySize = activeVariant?.size || 'auto';
-      retryProviderId = activeVariant?.providerId
-        || inputRef.current?.getProviderId()
-        || config?.defaultProviderId
-        || '';
-      retryProvider = config?.providers.find((provider) => provider.id === retryProviderId)
-        || config?.providers.find((provider) => provider.id === config.defaultProviderId)
-        || config?.providers[0];
+    const historyMessages = conversation.messages.slice(0, msgIdx);
+    const result = await runGeneration({
+      prompt: userMsg.generationPrompt || userMsg.text || '',
+      size: retrySize,
+      providerId: retryProviderId,
+      provider: retryProvider,
+      action: refImages.length ? 'edit' : 'auto',
+      images: refImages,
+      history: historyMessages,
+      errorTarget: conversation,
+    });
 
-      const historyMessages = conversation.messages.slice(0, msgIdx);
-      ctrl = new AbortController();
-      abortRef.current = ctrl;
-      const result = await generateImage({
-        prompt: userMsg.generationPrompt || userMsg.text || '',
-        size: retrySize,
-        thinking: 'low',
-        providerId: retryProviderId,
-        action: refImages.length ? 'edit' : 'auto',
-        images: refImages,
-        history: historyMessages,
-        signal: ctrl.signal,
-        onStream: (delta) => {
-          streamRef.current = { text: delta.text, thinking: delta.thinking, imageBase64: delta.imageBase64, done: !!delta.done };
-          if (isNearBottom()) scrollToBottom();
-        },
-      });
-      if (ctrl.signal.aborted) return;
-
-      let imageId: string | undefined;
-      if (result.imageBase64) {
-        imageId = await saveImage(result.imageBase64);
-      } else {
-        imageId = undefined;
-      }
-      if (ctrl.signal.aborted) return;
-
-      const updatedConv = { ...conversation };
-      updatedConv.messages = [...updatedConv.messages];
-      const updatedMsg = { ...updatedConv.messages[msgIdx] };
-
-      if (updatedMsg.error) {
-        updatedConv.messages[msgIdx] = {
-          role: 'assistant',
-          variants: [{
-            text: result.text || undefined,
-            imageId,
-            imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
-            thinking: result.thinking || undefined,
-            providerId: retryProvider?.id,
-            providerName: retryProvider?.name,
-            model: retryProvider?.model,
-            size: retrySize,
-            timestamp: Date.now(),
-          }],
-          activeVariant: 0,
-          timestamp: Date.now(),
-        };
-      } else {
-        const variants = [...getVariants(updatedMsg)];
-        variants.push({
-          text: result.text || undefined,
-          imageId,
-          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
-          thinking: result.thinking || undefined,
-          providerId: retryProvider?.id,
-          providerName: retryProvider?.name,
-          model: retryProvider?.model,
-          size: retrySize,
-          timestamp: Date.now(),
-        });
-        updatedMsg.variants = variants;
-        updatedMsg.imageBase64 = undefined;
-        updatedMsg.size = undefined;
-        updatedMsg.activeVariant = variants.length - 1;
-        updatedConv.messages[msgIdx] = updatedMsg;
-      }
-      setConversation(updatedConv);
-      await convStore.save(updatedConv);
-      recordGenerationOutcome({
-        providerId: retryProvider?.id || retryProviderId || 'unknown',
-        providerName: retryProvider?.name,
-        model: retryProvider?.model,
-        ok: true,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      const message = err instanceof Error ? err.message : 'Retry failed';
-      recordGenerationOutcome({
-        providerId: retryProvider?.id || retryProviderId || 'unknown',
-        providerName: retryProvider?.name,
-        model: retryProvider?.model,
-        ok: false,
-        durationMs: Math.round(performance.now() - startedAt),
-        error: message,
-      });
-      toast.show(message, { type: 'error' });
-    } finally {
-      if (abortRef.current === ctrl) abortRef.current = null;
-      setRetryingIdx(-1);
-      streamRef.current = null;
-      setShowStream(false);
-      setIsGenerating(false);
-      scrollToBottom();
+    if (!result) {
+      return;
     }
-  }
 
-  function handleVariantChange(msgIdx: number, direction: -1 | 1) {
+    const updatedConv = { ...conversation };
+    updatedConv.messages = [...updatedConv.messages];
+    const updatedMsg = { ...updatedConv.messages[msgIdx] };
+
+    if (updatedMsg.error) {
+      updatedConv.messages[msgIdx] = {
+        role: 'assistant',
+        variants: [result.variant],
+        activeVariant: 0,
+        timestamp: Date.now(),
+      };
+    } else {
+      const variants = [...getVariants(updatedMsg), result.variant];
+      updatedMsg.variants = variants;
+      updatedMsg.imageBase64 = undefined;
+      updatedMsg.size = undefined;
+      updatedMsg.activeVariant = variants.length - 1;
+      updatedConv.messages[msgIdx] = updatedMsg;
+    }
+    setConversation(updatedConv);
+    await convStore.save(updatedConv);
+  }, [config, conversation, convStore, isGenerating]);
+
+  const handleVariantChange = useCallback((msgIdx: number, direction: -1 | 1) => {
     if (!conversation) return;
     const updatedConv = { ...conversation };
     updatedConv.messages = [...updatedConv.messages];
@@ -560,7 +517,7 @@ export default function Chat() {
     updatedConv.messages[msgIdx] = msg;
     setConversation(updatedConv);
     void convStore.save(updatedConv);
-  }
+  }, [conversation, convStore]);
 
   const handleEdit = useCallback((src: string) => {
     inputRef.current?.setImages([src]);
@@ -572,15 +529,7 @@ export default function Chat() {
   }, [openLightbox]);
 
   const handleCopyPrompt = useCallback(async (prompt: string) => {
-    const value = prompt.trim();
-    if (!value) return;
-    try {
-      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(value);
-      toast.show('Prompt copied', { type: 'success' });
-    } catch {
-      toast.show('Unable to copy prompt', { type: 'error' });
-    }
+    await copyToClipboard(prompt.trim(), toast);
   }, [toast]);
 
   const handleImageAction = useCallback((action: Exclude<ImageAction, 'copy'>, src: string, prompt: string) => {
@@ -631,7 +580,7 @@ export default function Chat() {
             if (retryingIdx >= 0 && i === retryingIdx && showStream) {
               return (
                 <div key={i}>
-                  <StreamBubble streamRef={streamRef} showThinking={!!config?.showThinking} />
+                  <StreamBubble streamRef={streamRef} />
                 </div>
               );
             }
@@ -643,7 +592,6 @@ export default function Chat() {
                 msg={msg}
                 index={i}
                 isGenerating={isGenerating}
-                showThinking={!!config?.showThinking}
                 onRetry={handleRetry}
                 onVariantChange={handleVariantChange}
                 onEdit={handleEdit}
@@ -659,7 +607,7 @@ export default function Chat() {
         })}
 
         {showStream && retryingIdx < 0 && (
-          <StreamBubble streamRef={streamRef} showThinking={!!config?.showThinking} />
+          <StreamBubble streamRef={streamRef} />
         )}
       </div>
 

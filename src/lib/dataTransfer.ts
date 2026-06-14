@@ -1,5 +1,5 @@
 import type { Config, Conversation } from '../types';
-import { collectConversationImageIds, remapConversationImageIds } from './dataTransferCore';
+import { cloneConversation, collectConversationImageIds, remapConversationImageIds } from './dataTransferCore';
 import { useConfigStore, useConversationStore } from './store';
 import { getImageBase64, saveImage } from './imageStore';
 import { loadGalleryMeta, saveGalleryMeta, type GalleryMetaMap } from './galleryMeta';
@@ -27,10 +27,6 @@ export interface PichatExportData {
 
 export { collectConversationImageIds, remapConversationImageIds };
 
-function cloneConversation(conversation: Conversation): Conversation {
-  return JSON.parse(JSON.stringify(conversation)) as Conversation;
-}
-
 export async function exportPichatData(): Promise<PichatExportData> {
   const convStore = useConversationStore.getState();
   await convStore.loadAll();
@@ -56,6 +52,9 @@ export async function importPichatData(data: PichatExportData): Promise<void> {
   if (!data || data.version !== 1) {
     throw new Error('Unsupported Pichat export file');
   }
+  if (!Array.isArray(data.conversations)) {
+    throw new Error('Invalid export file: conversations must be an array');
+  }
 
   const imageIdMap = new Map<string, string>();
   for (const [oldId, base64] of Object.entries(data.images || {})) {
@@ -67,7 +66,7 @@ export async function importPichatData(data: PichatExportData): Promise<void> {
   for (const conversation of useConversationStore.getState().conversations) {
     await convStore.remove(conversation.id);
   }
-  for (const conversation of data.conversations || []) {
+  for (const conversation of data.conversations) {
     await convStore.save(remapConversationImageIds(conversation, imageIdMap));
   }
 
@@ -77,12 +76,4 @@ export async function importPichatData(data: PichatExportData): Promise<void> {
   saveProviderStats(data.providerStats || {});
 }
 
-export function downloadJsonFile(filename: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+export { downloadJsonFile } from './download';
