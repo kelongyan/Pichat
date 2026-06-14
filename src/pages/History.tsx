@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Clock, Trash2 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { useConversationStore } from '../lib/store';
-import { getThumbURL } from '../lib/imageStore';
+import { getThumbURL, toImageDataUrl } from '../lib/imageStore';
 import type { Conversation, Message } from '../types';
 
 interface ThumbInfo {
@@ -39,7 +39,7 @@ function formatTime(ts: number): string {
 
 function ThumbImage({ info }: { info: ThumbInfo }) {
   const [src, setSrc] = useState(() =>
-    info.imageBase64 ? `data:image/png;base64,${info.imageBase64}` : ''
+    info.imageBase64 ? toImageDataUrl(info.imageBase64) : ''
   );
 
   useEffect(() => {

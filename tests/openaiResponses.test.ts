@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildResponsesPayload } from '../src/lib/openaiResponses.ts';
+import { buildResponsesPayload, readResponsesStream } from '../src/lib/openaiResponses.ts';
 
 const config = {
   providers: [],
@@ -20,6 +20,18 @@ const provider = {
   createdAt: 1,
   updatedAt: 1,
 };
+
+function streamResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  return new Response(new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(chunk));
+      }
+      controller.close();
+    },
+  }));
+}
 
 test('buildResponsesPayload uses generationPrompt and all stored reference images in history', () => {
   const payload = buildResponsesPayload({
@@ -67,4 +79,33 @@ test('buildResponsesPayload omits auto size from image_generation tool payload',
   });
 
   assert.equal('size' in payload.tools[0], false);
+});
+
+test('readResponsesStream accepts typed data-only SSE events', async () => {
+  const deltas: Array<{ text: string | null; imageBase64: string | null; done?: boolean }> = [];
+  const response = streamResponse([
+    `data: ${JSON.stringify({ type: 'response.output_text.delta', delta: 'draft ' })}\n\n`,
+    `data: ${JSON.stringify({ type: 'response.image_generation_call.partial_image', partial_image_b64: 'partial-image' })}\n\n`,
+    `data: ${JSON.stringify({
+      type: 'response.completed',
+      response: {
+        output: [
+          { type: 'message', content: [{ type: 'output_text', text: 'final text' }] },
+          { type: 'image_generation_call', result: 'final-image' },
+        ],
+      },
+    })}\n\n`,
+  ]);
+
+  const result = await readResponsesStream(response, (delta) => {
+    deltas.push({
+      text: delta.text,
+      imageBase64: delta.imageBase64,
+      done: delta.done,
+    });
+  });
+
+  assert.equal(result.text, 'final text');
+  assert.equal(result.imageBase64, 'final-image');
+  assert.equal(deltas.at(-1)?.done, true);
 });

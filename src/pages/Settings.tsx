@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Download, FileText, Plus, Trash2, Upload, X } from 'lucide-react';
+import { BarChart3, Download, FileText, Plus, Trash2, Upload, X, ArrowLeft } from 'lucide-react';
 function GithubIcon({ size = 24 }: { size?: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -8,13 +8,12 @@ function GithubIcon({ size = 24 }: { size?: number }) {
     </svg>
   );
 }
-import { Header } from '../components/Header';
 import { useToast } from '../components/Toast';
 import { generateId, useConfigStore } from '../lib/store';
 import { downloadJsonFile, exportPichatData, importPichatData, type PichatExportData } from '../lib/dataTransfer';
 import { loadCustomPromptTemplates, saveCustomPromptTemplates, type PromptTemplate } from '../lib/promptTemplates';
 import { loadProviderStats, summarizeProviderStats, type ProviderStatsSummary } from '../lib/providerStats';
-import type { Config, ProviderConfig } from '../types';
+import type { Config, ProviderConfig, Protocol } from '../types';
 
 const GITHUB_URL = 'https://github.com/kelongyan/Pichat';
 
@@ -35,6 +34,7 @@ function createProvider(name = 'New Provider'): ProviderConfig {
     baseURL: '',
     apiKey: '',
     model: 'gpt-5.4',
+    protocol: 'responses',
     createdAt: now,
     updatedAt: now,
   };
@@ -59,11 +59,21 @@ function validateProvider(provider: ProviderConfig): string | null {
 }
 
 async function testProviderConnection(provider: ProviderConfig): Promise<void> {
-  const resp = await fetch(`${provider.baseURL.trim().replace(/\/+$/, '')}/models`, {
-    headers: { Authorization: `Bearer ${provider.apiKey.trim()}` },
+  const base = provider.baseURL.trim().replace(/\/+$/, '');
+  const protocol = provider.protocol || 'responses';
+  const endpoint = protocol === 'images' ? '/images/generations' : '/models';
+  const resp = await fetch(`${base}${endpoint}`, {
+    method: protocol === 'images' ? 'POST' : 'HEAD',
+    headers: {
+      Authorization: `Bearer ${provider.apiKey.trim()}`,
+      ...(protocol === 'images' ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: protocol === 'images'
+      ? JSON.stringify({ model: provider.model, prompt: 'test', n: 1, response_format: 'b64_json' })
+      : undefined,
     signal: AbortSignal.timeout(10000),
   });
-  if (!resp.ok && resp.status !== 404) {
+  if (!resp.ok && !(protocol === 'responses' && resp.status === 404)) {
     throw new Error(`HTTP ${resp.status}`);
   }
 }
@@ -90,33 +100,18 @@ function ConnectView() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     const b = baseURL.trim();
     const k = apiKey.trim();
     const m = model.trim() || 'gpt-5.4';
     const n = providerName.trim() || 'Default';
 
-    if (!b || !k) {
-      showToast('Please fill in all required fields', { type: 'error' });
-      return;
-    }
-    if (!isValidHttpUrl(b)) {
-      showToast('Please enter a valid HTTP(S) API Base URL', { type: 'error' });
-      return;
-    }
+    if (!b || !k) { showToast('Please fill in all required fields', { type: 'error' }); return; }
+    if (!isValidHttpUrl(b)) { showToast('Please enter a valid HTTP(S) API Base URL', { type: 'error' }); return; }
 
     setConnecting(true);
     try {
       const now = Date.now();
-      const provider: ProviderConfig = {
-        id: generateId(),
-        name: n,
-        baseURL: b,
-        apiKey: k,
-        model: m,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const provider: ProviderConfig = { id: generateId(), name: n, baseURL: b, apiKey: k, model: m, createdAt: now, updatedAt: now };
       await testProviderConnection(provider);
       saveConfig({
         providers: [provider],
@@ -137,92 +132,32 @@ function ConnectView() {
 
   return (
     <>
-      <a
-        href={GITHUB_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="settings-github"
-        title="GitHub"
-      >
+      <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="settings-github" title="GitHub">
         <GithubIcon size={22} />
       </a>
       <div className="view-centered fade-in">
-        <div className="settings-view" style={{ width: '100%', padding: '0 20px' }}>
-          <img
-            src="assets/OpenAI.png"
-            alt="Pichat"
-            style={{
-              width: 60,
-              height: 60,
-              objectFit: 'contain',
-              marginBottom: 30,
-            }}
-          />
+        <div className="settings-view">
+          <img src="assets/OpenAI.png" alt="Pichat" className="settings-logo" />
           <h2 className="settings-title">Configure Pichat</h2>
-          <p className="settings-subtitle">
-            Connect to an OpenAI-compatible API endpoint
-          </p>
-          <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+          <p className="settings-subtitle">Connect to an OpenAI-compatible API endpoint</p>
+          <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label" htmlFor="provider-name">
-                Provider Name
-              </label>
-              <input
-                className="form-input"
-                id="provider-name"
-                type="text"
-                value={providerName}
-                onChange={(e) => setProviderName(e.target.value)}
-                placeholder="OpenAI"
-                required
-              />
+              <label className="form-label" htmlFor="provider-name">Provider Name</label>
+              <input className="form-input" id="provider-name" type="text" value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="OpenAI" required />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="base-url">
-                API Base URL
-              </label>
-              <input
-                className="form-input"
-                id="base-url"
-                type="url"
-                value={baseURL}
-                onChange={(e) => setBaseURL(e.target.value)}
-                placeholder="https://api.openai.com/v1"
-                required
-              />
+              <label className="form-label" htmlFor="base-url">API Base URL</label>
+              <input className="form-input" id="base-url" type="url" value={baseURL} onChange={(e) => setBaseURL(e.target.value)} placeholder="https://api.openai.com/v1" required />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="api-key">
-                API Key
-              </label>
-              <input
-                className="form-input"
-                id="api-key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
-                required
-              />
+              <label className="form-label" htmlFor="api-key">API Key</label>
+              <input className="form-input" id="api-key" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." required />
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="model">
-                Model
-              </label>
-              <input
-                className="form-input"
-                id="model"
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="gpt-5.4"
-              />
+              <label className="form-label" htmlFor="model">Model</label>
+              <input className="form-input" id="model" type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-5.4" />
             </div>
-            <button
-              className="btn-primary"
-              type="submit"
-              disabled={connecting}
-            >
+            <button className="btn-primary" type="submit" disabled={connecting}>
               {connecting ? 'Connecting...' : 'Connect'}
             </button>
           </form>
@@ -238,24 +173,18 @@ function FullSettings({ config }: { config: Config }) {
   const saveConfig = useConfigStore((s) => s.save);
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const [providers, setProviders] = useState<ProviderConfig[]>(
-    config.providers.length ? config.providers : [createProvider('Default')],
+  const [providers, setProviders] = useState<ProviderConfig[]>(() =>
+    config.providers.length ? config.providers : [createProvider('Default')]
   );
-  const [defaultProviderId, setDefaultProviderId] = useState(
-    config.defaultProviderId || config.providers[0]?.id || '',
-  );
+  const [defaultProviderId, setDefaultProviderId] = useState(config.defaultProviderId || config.providers[0]?.id || '');
   const [showThinking, setShowThinking] = useState(!!config.showThinking);
   const [useSystemPrompt, setUseSystemPrompt] = useState(config.useSystemPrompt !== false);
   const [testingId, setTestingId] = useState('');
   const [templates, setTemplates] = useState<PromptTemplate[]>(() => loadCustomPromptTemplates());
-  const [providerStats, setProviderStats] = useState<ProviderStatsSummary[]>(() => (
-    summarizeProviderStats(loadProviderStats())
-  ));
+  const [providerStats, setProviderStats] = useState<ProviderStatsSummary[]>(() => summarizeProviderStats(loadProviderStats()));
 
   function updateProvider(id: string, patch: Partial<ProviderConfig>) {
-    setProviders((items) => items.map((provider) => (
-      provider.id === id ? { ...provider, ...patch } : provider
-    )));
+    setProviders((items) => items.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
   function handleAddProvider() {
@@ -265,24 +194,16 @@ function FullSettings({ config }: { config: Config }) {
   }
 
   function updateTemplate(id: string, patch: Partial<PromptTemplate>) {
-    setTemplates((items) => items.map((template) => (
-      template.id === id ? { ...template, ...patch, updatedAt: Date.now() } : template
-    )));
+    setTemplates((items) => items.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t)));
   }
 
   function handleAddTemplate() {
     const now = Date.now();
-    setTemplates((items) => [...items, {
-      id: generateId(),
-      name: `Template ${items.length + 1}`,
-      template: '{prompt}, polished composition, refined lighting, no watermark.',
-      createdAt: now,
-      updatedAt: now,
-    }]);
+    setTemplates((items) => [...items, { id: generateId(), name: `Template ${items.length + 1}`, template: '{prompt}, polished composition, refined lighting, no watermark.', createdAt: now, updatedAt: now }]);
   }
 
   function handleRemoveTemplate(id: string) {
-    setTemplates((items) => items.filter((template) => template.id !== id));
+    setTemplates((items) => items.filter((t) => t.id !== id));
   }
 
   function handleSaveTemplates() {
@@ -298,8 +219,7 @@ function FullSettings({ config }: { config: Config }) {
   async function handleExportData() {
     try {
       const data = await exportPichatData();
-      const date = new Date().toISOString().slice(0, 10);
-      downloadJsonFile(`pichat-export-${date}.json`, data);
+      downloadJsonFile(`pichat-export-${new Date().toISOString().slice(0, 10)}.json`, data);
       showToast('Export file prepared', { type: 'success' });
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', { type: 'error' });
@@ -313,12 +233,7 @@ function FullSettings({ config }: { config: Config }) {
     try {
       const data = JSON.parse(await file.text()) as PichatExportData;
       await importPichatData(data);
-      if (data.config) {
-        setProviders(data.config.providers);
-        setDefaultProviderId(data.config.defaultProviderId);
-        setShowThinking(data.config.showThinking);
-        setUseSystemPrompt(data.config.useSystemPrompt !== false);
-      }
+      if (data.config) { setProviders(data.config.providers); setDefaultProviderId(data.config.defaultProviderId); setShowThinking(data.config.showThinking); setUseSystemPrompt(data.config.useSystemPrompt !== false); }
       setTemplates(loadCustomPromptTemplates());
       refreshProviderStats();
       showToast('Import complete', { type: 'success' });
@@ -328,24 +243,16 @@ function FullSettings({ config }: { config: Config }) {
   }
 
   function handleRemoveProvider(id: string) {
-    if (providers.length <= 1) {
-      showToast('At least one provider is required', { type: 'error' });
-      return;
-    }
-    const nextProviders = providers.filter((provider) => provider.id !== id);
-    setProviders(nextProviders);
-    if (defaultProviderId === id) {
-      setDefaultProviderId(nextProviders[0].id);
-    }
+    if (providers.length <= 1) { showToast('At least one provider is required', { type: 'error' }); return; }
+    const next = providers.filter((p) => p.id !== id);
+    setProviders(next);
+    if (defaultProviderId === id) setDefaultProviderId(next[0].id);
   }
 
   async function handleTestProvider(provider: ProviderConfig) {
     const sanitized = sanitizeProvider(provider);
     const error = validateProvider(sanitized);
-    if (error) {
-      showToast(error, { type: 'error' });
-      return;
-    }
+    if (error) { showToast(error, { type: 'error' }); return; }
     setTestingId(provider.id);
     try {
       await testProviderConnection(sanitized);
@@ -358,296 +265,196 @@ function FullSettings({ config }: { config: Config }) {
   }
 
   function handleSave() {
-    const sanitizedProviders = providers.map(sanitizeProvider);
-    for (const provider of sanitizedProviders) {
-      const error = validateProvider(provider);
-      if (error) {
-        showToast(error, { type: 'error' });
-        return;
-      }
-    }
-    const defaultId = sanitizedProviders.some((provider) => provider.id === defaultProviderId)
-      ? defaultProviderId
-      : sanitizedProviders[0].id;
-    saveConfig({
-      providers: sanitizedProviders,
-      defaultProviderId: defaultId,
-      showThinking,
-      thinkingLevel: config.thinkingLevel || 'low',
-      darkMode: config.darkMode ?? false,
-      useSystemPrompt,
-    });
-    setProviders(sanitizedProviders);
+    const sanitized = providers.map(sanitizeProvider);
+    for (const p of sanitized) { const e = validateProvider(p); if (e) { showToast(e, { type: 'error' }); return; } }
+    const defaultId = sanitized.some((p) => p.id === defaultProviderId) ? defaultProviderId : sanitized[0].id;
+    saveConfig({ providers: sanitized, defaultProviderId: defaultId, showThinking, thinkingLevel: config.thinkingLevel || 'low', darkMode: config.darkMode ?? false, useSystemPrompt });
+    setProviders(sanitized);
     setDefaultProviderId(defaultId);
     showToast('Settings saved', { type: 'success' });
   }
 
   return (
     <>
-      <Header activeTab="" />
-      <div className="settings-full fade-in">
-        <div className="settings-full-header">
-          <h2 className="settings-full-title">Settings</h2>
-          <button
-            className="settings-close-btn"
-            type="button"
-            title="Close settings"
-            aria-label="Close settings"
-            onClick={() => navigate(-1)}
-          >
-            <X size={20} />
+      <div className="settings-page">
+        <div className="settings-page-header">
+          <button className="settings-back-btn" type="button" onClick={() => navigate('/create')}>
+            <ArrowLeft size={18} />
           </button>
+          <h2 className="settings-page-title">Settings</h2>
+          <div className="settings-page-spacer" />
         </div>
 
-        <div className="settings-section">
-          <div className="settings-section-title">PROVIDERS</div>
-          <div className="provider-list">
-            {providers.map((provider) => (
-              <div
-                key={provider.id}
-                className={`provider-card${provider.id === defaultProviderId ? ' default' : ''}`}
-              >
-                <div className="provider-card-header">
-                  <div>
-                    <div className="provider-card-title">{provider.name || 'Untitled Provider'}</div>
-                    <div className="provider-card-meta">{provider.model || 'gpt-5.4'}</div>
+        <div className="settings-page-body">
+          <div className="settings-card">
+            <div className="settings-card-title">Providers</div>
+            <div className="provider-list">
+              {providers.map((provider) => (
+                <div key={provider.id} className={`provider-card${provider.id === defaultProviderId ? ' default' : ''}`}>
+                  <div className="provider-card-top">
+                    <div className="provider-card-info">
+                      <div className="provider-card-name">{provider.name || 'Untitled'}</div>
+                      <div className="provider-card-meta">{provider.model} &middot; {provider.protocol || 'responses'}</div>
+                    </div>
+                    <div className="provider-card-actions">
+                      <button className="provider-action-btn" type="button" disabled={provider.id === defaultProviderId} onClick={() => setDefaultProviderId(provider.id)}>
+                        {provider.id === defaultProviderId ? 'Default' : 'Set Default'}
+                      </button>
+                      <button className="provider-action-btn" type="button" disabled={testingId === provider.id} onClick={() => handleTestProvider(provider)}>
+                        {testingId === provider.id ? 'Testing...' : 'Test'}
+                      </button>
+                      <button className="provider-icon-btn" type="button" title="Remove" disabled={providers.length <= 1} onClick={() => handleRemoveProvider(provider.id)}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="provider-card-actions">
-                    <button
-                      className="provider-action-btn"
-                      type="button"
-                      disabled={provider.id === defaultProviderId}
-                      onClick={() => setDefaultProviderId(provider.id)}
-                    >
-                      {provider.id === defaultProviderId ? 'Default' : 'Set Default'}
-                    </button>
-                    <button
-                      className="provider-action-btn"
-                      type="button"
-                      disabled={testingId === provider.id}
-                      onClick={() => handleTestProvider(provider)}
-                    >
-                      {testingId === provider.id ? 'Testing...' : 'Test'}
-                    </button>
-                    <button
-                      className="provider-icon-btn"
-                      type="button"
-                      title="Remove provider"
-                      disabled={providers.length <= 1}
-                      onClick={() => handleRemoveProvider(provider.id)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="provider-fields">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`provider-name-${provider.id}`}>
-                      Provider Name
-                    </label>
-                    <input
-                      className="form-input"
-                      id={`provider-name-${provider.id}`}
-                      type="text"
-                      value={provider.name}
-                      onChange={(e) => updateProvider(provider.id, { name: e.target.value })}
-                      placeholder="OpenAI"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`base-url-${provider.id}`}>
-                      API Base URL
-                    </label>
-                    <input
-                      className="form-input"
-                      id={`base-url-${provider.id}`}
-                      type="url"
-                      value={provider.baseURL}
-                      onChange={(e) => updateProvider(provider.id, { baseURL: e.target.value })}
-                      placeholder="https://api.openai.com/v1"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`api-key-${provider.id}`}>
-                      API Key
-                    </label>
-                    <input
-                      className="form-input"
-                      id={`api-key-${provider.id}`}
-                      type="password"
-                      value={provider.apiKey}
-                      onChange={(e) => updateProvider(provider.id, { apiKey: e.target.value })}
-                      placeholder="sk-..."
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`model-${provider.id}`}>
-                      Model
-                    </label>
-                    <input
-                      className="form-input"
-                      id={`model-${provider.id}`}
-                      type="text"
-                      value={provider.model}
-                      onChange={(e) => updateProvider(provider.id, { model: e.target.value })}
-                      placeholder="gpt-5.4"
-                    />
+                  <div className="provider-fields">
+                    <div className="provider-fields-row">
+                      <div className="form-group">
+                        <label className="form-label">Name</label>
+                        <input className="form-input" type="text" value={provider.name} onChange={(e) => updateProvider(provider.id, { name: e.target.value })} placeholder="OpenAI" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Model</label>
+                        <input className="form-input" type="text" value={provider.model} onChange={(e) => updateProvider(provider.id, { model: e.target.value })} placeholder="gpt-5.4" />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Base URL</label>
+                      <input className="form-input" type="url" value={provider.baseURL} onChange={(e) => updateProvider(provider.id, { baseURL: e.target.value })} placeholder="https://api.openai.com/v1" />
+                    </div>
+                    <div className="provider-fields-row">
+                      <div className="form-group">
+                        <label className="form-label">API Key</label>
+                        <input className="form-input" type="password" value={provider.apiKey} onChange={(e) => updateProvider(provider.id, { apiKey: e.target.value })} placeholder="sk-..." />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Protocol</label>
+                        <div className="protocol-pills">
+                          <button
+                            type="button"
+                            className={`protocol-pill${(provider.protocol || 'responses') === 'responses' ? ' active' : ''}`}
+                            onClick={() => updateProvider(provider.id, { protocol: 'responses' })}
+                          >
+                            Responses
+                          </button>
+                          <button
+                            type="button"
+                            className={`protocol-pill${provider.protocol === 'images' ? ' active' : ''}`}
+                            onClick={() => updateProvider(provider.id, { protocol: 'images' })}
+                          >
+                            Images
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          <button
-            className="settings-secondary-btn"
-            type="button"
-            onClick={handleAddProvider}
-          >
-            <Plus size={16} /> <span>Add Provider</span>
-          </button>
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-title">PREFERENCES</div>
-          <div className="settings-toggle-row">
-            <div className="settings-toggle-info">
-              <span className="settings-toggle-name">Show thinking process</span>
-              <span className="settings-toggle-desc">
-                Display model reasoning in a collapsible block
-              </span>
+              ))}
             </div>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={showThinking}
-                onChange={(e) => setShowThinking(e.target.checked)}
-              />
-              <span className="toggle-slider" />
-            </label>
+            <button className="settings-add-btn" type="button" onClick={handleAddProvider}>
+              <Plus size={16} /> Add Provider
+            </button>
           </div>
-          <div className="settings-toggle-row">
-            <div className="settings-toggle-info">
-              <span className="settings-toggle-name">System prompt</span>
-              <span className="settings-toggle-desc">
-                Inject full personality and style instructions. When off, only model metadata is sent.
-              </span>
-            </div>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={useSystemPrompt}
-                onChange={(e) => setUseSystemPrompt(e.target.checked)}
-              />
-              <span className="toggle-slider" />
-            </label>
-          </div>
-        </div>
 
-        <div className="settings-section">
-          <div className="settings-section-title">PROMPT TEMPLATES</div>
-          <div className="template-list">
-            {templates.map((template) => (
-              <div key={template.id} className="template-card">
-                <div className="template-card-header">
-                  <FileText size={15} />
-                  <input
-                    className="form-input"
-                    value={template.name}
-                    onChange={(e) => updateTemplate(template.id, { name: e.target.value })}
-                    placeholder="Template name"
-                  />
-                  <button
-                    className="provider-icon-btn"
-                    type="button"
-                    title="Remove template"
-                    onClick={() => handleRemoveTemplate(template.id)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-                <textarea
-                  className="form-input template-textarea"
-                  value={template.template}
-                  onChange={(e) => updateTemplate(template.id, { template: e.target.value })}
-                  placeholder="Use {prompt} where the user's prompt should be inserted"
-                  rows={3}
-                />
+          <div className="settings-card">
+            <div className="settings-card-title">Preferences</div>
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-info">
+                <span className="settings-toggle-name">Show thinking</span>
+                <span className="settings-toggle-desc">Display model reasoning in a collapsible block</span>
               </div>
-            ))}
+              <label className="toggle-switch">
+                <input type="checkbox" checked={showThinking} onChange={(e) => setShowThinking(e.target.checked)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-info">
+                <span className="settings-toggle-name">System prompt</span>
+                <span className="settings-toggle-desc">Inject personality and style instructions</span>
+              </div>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={useSystemPrompt} onChange={(e) => setUseSystemPrompt(e.target.checked)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
           </div>
-          <div className="settings-action-row">
-            <button className="settings-secondary-btn" type="button" onClick={handleAddTemplate}>
-              <Plus size={16} /> <span>Add Template</span>
-            </button>
-            <button className="settings-secondary-btn" type="button" onClick={handleSaveTemplates}>
-              <FileText size={16} /> <span>Save Templates</span>
-            </button>
-          </div>
-        </div>
 
-        <div className="settings-section">
-          <div className="settings-section-title">DATA</div>
-          <div className="settings-action-row">
-            <button className="settings-secondary-btn" type="button" onClick={handleExportData}>
-              <Download size={16} /> <span>Export Data</span>
-            </button>
-            <button className="settings-secondary-btn" type="button" onClick={() => importInputRef.current?.click()}>
-              <Upload size={16} /> <span>Import Data</span>
-            </button>
+          <div className="settings-card">
+            <div className="settings-card-title">Data</div>
+            <div className="settings-action-row">
+              <button className="settings-action-btn" type="button" onClick={handleExportData}>
+                <Download size={16} /> Export
+              </button>
+              <button className="settings-action-btn" type="button" onClick={() => importInputRef.current?.click()}>
+                <Upload size={16} /> Import
+              </button>
+            </div>
+            <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleImportFile} />
           </div>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json,.json"
-            style={{ display: 'none' }}
-            onChange={handleImportFile}
-          />
-        </div>
 
-        <div className="settings-section">
-          <div className="settings-section-title">PROVIDER STATS</div>
-          <div className="provider-stats-list">
+          <div className="settings-card">
+            <div className="settings-card-title">Prompt Templates</div>
+            <div className="template-list">
+              {templates.map((template) => (
+                <div key={template.id} className="template-card">
+                  <div className="template-card-header">
+                    <FileText size={14} />
+                    <input className="form-input" value={template.name} onChange={(e) => updateTemplate(template.id, { name: e.target.value })} placeholder="Template name" />
+                    <button className="provider-icon-btn" type="button" title="Remove" onClick={() => handleRemoveTemplate(template.id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <textarea className="form-input template-textarea" value={template.template} onChange={(e) => updateTemplate(template.id, { template: e.target.value })} placeholder="Use {prompt} for user input" rows={2} />
+                </div>
+              ))}
+            </div>
+            <div className="settings-action-row">
+              <button className="settings-action-btn" type="button" onClick={handleAddTemplate}>
+                <Plus size={16} /> Add
+              </button>
+              <button className="settings-action-btn" type="button" onClick={handleSaveTemplates}>
+                <FileText size={16} /> Save
+              </button>
+            </div>
+          </div>
+
+          <div className="settings-card">
+            <div className="settings-card-title">Provider Stats</div>
             {providerStats.length === 0 ? (
               <div className="provider-stats-empty">No generation stats yet</div>
-            ) : providerStats.map((stat) => (
-              <div key={stat.providerId} className="provider-stat-card">
-                <div>
-                  <div className="provider-card-title">{stat.providerName || stat.providerId}</div>
-                  <div className="provider-card-meta">{stat.model || 'Model unknown'}</div>
-                </div>
-                <div className="provider-stat-metrics">
-                  <span>{Math.round(stat.successRate * 100)}% success</span>
-                  <span>{stat.avgDurationMs}ms avg</span>
-                  <span>{stat.total} runs</span>
-                </div>
+            ) : (
+              <div className="provider-stats-list">
+                {providerStats.map((stat) => (
+                  <div key={stat.providerId} className="provider-stat-card">
+                    <div className="provider-stat-info">
+                      <span className="provider-stat-name">{stat.providerName || stat.providerId}</span>
+                      <span className="provider-stat-model">{stat.model || 'Unknown'}</span>
+                    </div>
+                    <div className="provider-stat-metrics">
+                      <span>{Math.round(stat.successRate * 100)}% success</span>
+                      <span>{stat.avgDurationMs}ms avg</span>
+                      <span>{stat.total} runs</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            <button className="settings-action-btn" type="button" onClick={refreshProviderStats} style={{ marginTop: 12 }}>
+              <BarChart3 size={16} /> Refresh
+            </button>
           </div>
-          <button className="settings-secondary-btn" type="button" onClick={refreshProviderStats}>
-            <BarChart3 size={16} /> <span>Refresh Stats</span>
+
+          <button className="btn-primary settings-save-main" onClick={handleSave}>
+            Save Settings
           </button>
-        </div>
 
-        <button
-          className="btn-primary"
-          style={{ marginTop: 12 }}
-          onClick={handleSave}
-        >
-          Save
-        </button>
-
-        <div className="settings-footer">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="settings-footer-link"
-          >
-            <GithubIcon size={16} /> <span>GitHub</span>
-          </a>
+          <div className="settings-page-footer">
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="settings-footer-link">
+              <GithubIcon size={16} /> GitHub
+            </a>
+          </div>
         </div>
       </div>
     </>

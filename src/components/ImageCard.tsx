@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Pencil, Maximize2, Copy, Sparkles } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
-import { getImageURL, getThumbURL, getImageBlob, getImageBase64 } from '../lib/imageStore';
+import { getImageURL, getThumbURL, getImageBlob, getImageBase64, toImageDataUrl } from '../lib/imageStore';
 import { getImageActionLabel, type ImageAction } from '../lib/imageActions';
 
 type CardImageAction = Exclude<ImageAction, 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
@@ -34,9 +34,13 @@ export function ImageCard({
   onAction,
 }: ImageCardProps) {
   const [src, setSrc] = useState(() =>
-    imageBase64 ? `data:image/png;base64,${imageBase64}` : ''
+    imageBase64 ? toImageDataUrl(imageBase64) : ''
   );
   const [fullSrc, setFullSrc] = useState('');
+
+  useEffect(() => {
+    setSrc(imageBase64 ? toImageDataUrl(imageBase64) : '');
+  }, [imageBase64]);
 
   useEffect(() => {
     if (imageId) {
@@ -69,7 +73,7 @@ export function ImageCard({
   async function getReferenceSrc(): Promise<string> {
     if (imageId) {
       const base64 = await getImageBase64(imageId);
-      if (base64) return `data:image/png;base64,${base64}`;
+      if (base64) return toImageDataUrl(base64);
     }
     return fullSrc || src;
   }

@@ -8,12 +8,12 @@ import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { MarkdownRenderer } from '../lib/markdown';
 import { generateImage } from '../lib/api';
-import { saveImage } from '../lib/imageStore';
+import { saveImage, toImageDataUrl } from '../lib/imageStore';
 import { useConfigStore, useConversationStore, generateId } from '../lib/store';
 import { buildImageActionPrompt, type ImageAction } from '../lib/imageActions';
 import { recordGenerationOutcome } from '../lib/providerStats';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Conversation, Message, Variant, ThinkingLevel } from '../types';
+import type { Conversation, Message, Variant } from '../types';
 
 function getVariants(msg: Message): Variant[] {
   if (msg.variants) return msg.variants;
@@ -79,7 +79,7 @@ function StreamBubble({ streamRef, showThinking }: { streamRef: React.RefObject<
         {state.imageBase64 ? (
           <div className="result-image-frame">
             <img
-              src={`data:image/png;base64,${state.imageBase64}`}
+              src={toImageDataUrl(state.imageBase64)}
               alt=""
               className="stream-image"
             />
@@ -89,21 +89,6 @@ function StreamBubble({ streamRef, showThinking }: { streamRef: React.RefObject<
             <div className="result-image-sheen" />
           </div>
         )}
-        {(showThinking && state.thinking) || state.text ? (
-          <div className="result-copy">
-            {showThinking && state.thinking && (
-              <details className="thinking-block" open>
-                <summary className="thinking-summary">Thinking</summary>
-                <div className="thinking-content">{state.thinking}</div>
-              </details>
-            )}
-            {state.text && (
-              <div className="bubble-ai-text markdown-body">
-                <MarkdownRenderer content={state.text} />
-              </div>
-            )}
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -183,21 +168,6 @@ const MessageBubble = memo(function MessageBubble({
               />
             </div>
           )}
-          {!hasImage && ((showThinking && variant.thinking) || hasText) ? (
-            <div className="result-copy">
-              {showThinking && variant.thinking && (
-                <details className="thinking-block">
-                  <summary className="thinking-summary">Thinking</summary>
-                  <div className="thinking-content">{variant.thinking}</div>
-                </details>
-              )}
-              {hasText && (
-                <div className="bubble-ai-text markdown-body">
-                  <MarkdownRenderer content={variant.text!} />
-                </div>
-              )}
-            </div>
-          ) : null}
 
           <div className="message-actions">
             {variants.length > 1 && (
@@ -316,7 +286,6 @@ export default function Chat() {
         prompt: state.prompt,
         generationPrompt: state.generationPrompt,
         size: state.size || 'auto',
-        thinking: state.thinking || 'low',
         providerId: state.providerId || config?.defaultProviderId || '',
         images: state.images || [],
       });
@@ -370,9 +339,9 @@ export default function Chat() {
       const result = await generateImage({
         prompt: data.generationPrompt || data.prompt,
         size: data.size,
-        thinking: data.thinking,
+        thinking: 'low',
         providerId: data.providerId,
-        action: data.images?.length ? 'edit' : 'auto',
+        action: data.images?.length ? 'edit' : 'generate',
         images: data.images || [],
         history: historyMessages,
         signal: ctrl.signal,
@@ -386,6 +355,8 @@ export default function Chat() {
       let imageId: string | undefined;
       if (result.imageBase64) {
         imageId = await saveImage(result.imageBase64);
+      } else {
+        imageId = undefined;
       }
       if (ctrl.signal.aborted) return;
 
@@ -395,6 +366,7 @@ export default function Chat() {
         variants: [{
           text: result.text || undefined,
           imageId,
+          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
           thinking: result.thinking || undefined,
           providerId: provider?.id,
           providerName: provider?.name,
@@ -471,7 +443,6 @@ export default function Chat() {
       const refImages = getReferenceImages(userMsg);
       const activeVariant = getActiveVariant(msg);
       const retrySize = activeVariant?.size || 'auto';
-      const thinkingLevel = inputRef.current?.getThinking() || 'low';
       retryProviderId = activeVariant?.providerId
         || inputRef.current?.getProviderId()
         || config?.defaultProviderId
@@ -486,7 +457,7 @@ export default function Chat() {
       const result = await generateImage({
         prompt: userMsg.generationPrompt || userMsg.text || '',
         size: retrySize,
-        thinking: thinkingLevel,
+        thinking: 'low',
         providerId: retryProviderId,
         action: refImages.length ? 'edit' : 'auto',
         images: refImages,
@@ -502,6 +473,8 @@ export default function Chat() {
       let imageId: string | undefined;
       if (result.imageBase64) {
         imageId = await saveImage(result.imageBase64);
+      } else {
+        imageId = undefined;
       }
       if (ctrl.signal.aborted) return;
 
@@ -515,6 +488,7 @@ export default function Chat() {
           variants: [{
             text: result.text || undefined,
             imageId,
+            imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
             thinking: result.thinking || undefined,
             providerId: retryProvider?.id,
             providerName: retryProvider?.name,
@@ -530,6 +504,7 @@ export default function Chat() {
         variants.push({
           text: result.text || undefined,
           imageId,
+          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
           thinking: result.thinking || undefined,
           providerId: retryProvider?.id,
           providerName: retryProvider?.name,
@@ -695,8 +670,7 @@ export default function Chat() {
           onSend={handleSend}
           isGenerating={isGenerating}
           onStop={handleStopGeneration}
-          initialThinking={(state.thinking as ThinkingLevel | undefined) || 'low'}
-          initialProviderId={state.providerId}
+          providerId={config?.defaultProviderId || ''}
         />
       </div>
     </>

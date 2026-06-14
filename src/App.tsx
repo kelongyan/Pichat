@@ -9,7 +9,6 @@ import Landing from './pages/Landing';
 import Chat from './pages/Chat';
 import Gallery from './pages/Gallery';
 import History from './pages/History';
-import Waterfall from './pages/Waterfall';
 import Settings from './pages/Settings';
 
 function RequireConfig({ children }: { children: React.ReactNode }) {
@@ -28,7 +27,6 @@ function AppRoutes() {
       <Route path="/chat" element={<RequireConfig><Chat /></RequireConfig>} />
       <Route path="/gallery" element={<RequireConfig><Gallery /></RequireConfig>} />
       <Route path="/history" element={<RequireConfig><History /></RequireConfig>} />
-      <Route path="/waterfall" element={<RequireConfig><Waterfall /></RequireConfig>} />
       <Route path="/" element={<Navigate to="/create" replace />} />
       <Route path="*" element={<Navigate to="/create" replace />} />
     </Routes>

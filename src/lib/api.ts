@@ -1,9 +1,5 @@
 import { useConfigStore } from './store';
-import {
-  buildResponsesPayload,
-  parseResponsesJson,
-  readResponsesStream,
-} from './openaiResponses';
+import { getProtocolAdapter } from './protocols/router';
 import type {
   Config,
   GenerateImageParams,
@@ -144,10 +140,21 @@ export async function generateImage({
   const config = getConfig();
   if (!config) throw new Error('Not configured');
   const provider = resolveProvider(config, providerId);
+  const adapter = getProtocolAdapter(provider);
+
+  // 特性能力检查
+  if (thinking && thinking !== 'none' && !adapter.supportsThinking) {
+    thinking = undefined;
+  }
+
+  if (action === 'edit' && images.length > 0 && !adapter.supportsEditing) {
+    throw new Error(
+      'Image editing is not supported by the Images API protocol. Switch to a Responses API provider for editing.'
+    );
+  }
 
   const instructions = await getSystemPrompt(config.useSystemPrompt !== false);
-  const payload = buildResponsesPayload({
-    config,
+  const payload = adapter.buildPayload({
     provider,
     prompt,
     size,
@@ -159,10 +166,10 @@ export async function generateImage({
     stream: !!onStream,
   });
 
-  const url = `${provider.baseURL.replace(/\/+$/, '')}/responses`;
+  const url = `${provider.baseURL.replace(/\/+$/, '')}${adapter.getEndpoint()}`;
   let response: Response;
   let lastError: Error | null = null;
-  const maxAttempts = onStream ? 1 : MAX_RETRIES + 1;
+  const maxAttempts = (onStream && adapter.supportsStreaming) ? 1 : MAX_RETRIES + 1;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) {
@@ -217,6 +224,17 @@ export async function generateImage({
   }
 
   if (lastError) throw lastError;
-  if (!onStream) return parseResponsesJson(response!);
-  return readResponsesStream(response!, onStream);
+
+  // 流式处理
+  if (onStream) {
+    if (adapter.supportsStreaming && adapter.readStream) {
+      return adapter.readStream(response!, onStream);
+    }
+    // 降级：非流式请求，结果返回后一次性回调
+    const result = await adapter.parseResponse(response!);
+    onStream({ text: result.text, thinking: result.thinking, imageBase64: result.imageBase64, done: true });
+    return result;
+  }
+
+  return adapter.parseResponse(response!);
 }

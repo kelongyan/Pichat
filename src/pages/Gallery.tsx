@@ -6,7 +6,7 @@ import { ImageCard } from '../components/ImageCard';
 import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { useConversationStore } from '../lib/store';
-import { getImageURL, getThumbURL, revokeAll } from '../lib/imageStore';
+import { getImageURL, getThumbURL, revokeAll, toImageDataUrl } from '../lib/imageStore';
 import { buildImageActionPrompt } from '../lib/imageActions';
 import {
   buildGalleryImageKey,
@@ -34,7 +34,7 @@ const DEFAULT_FILTERS: GalleryFilterState = {
 
 function GalleryCompareThumb({ image }: { image: GalleryImage }) {
   const [src, setSrc] = useState(() => (
-    image.imageBase64 ? `data:image/png;base64,${image.imageBase64}` : ''
+    image.imageBase64 ? toImageDataUrl(image.imageBase64) : ''
   ));
 
   useEffect(() => {
@@ -156,7 +156,7 @@ export default function Gallery() {
         if (url) openLightbox(url, { prompt: img.prompt });
       });
     } else if (img.imageBase64) {
-      openLightbox(`data:image/png;base64,${img.imageBase64}`, { prompt: img.prompt });
+      openLightbox(toImageDataUrl(img.imageBase64), { prompt: img.prompt });
     }
   }, [openLightbox]);
 

@@ -258,6 +258,7 @@ function createProviderFromLegacy(parsed: Record<string, unknown>): ProviderConf
     baseURL,
     apiKey,
     model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : 'gpt-5.4',
+    protocol: 'responses' as const,
     createdAt: now,
     updatedAt: now,
   };
@@ -280,6 +281,9 @@ function normalizeProvider(raw: unknown, index: number): ProviderConfig | null {
     model: typeof provider.model === 'string' && provider.model.trim()
       ? provider.model.trim()
       : 'gpt-5.4',
+    protocol: (provider.protocol === 'responses' || provider.protocol === 'images')
+      ? provider.protocol
+      : 'responses' as const,
     createdAt: typeof provider.createdAt === 'number' ? provider.createdAt : now,
     updatedAt: typeof provider.updatedAt === 'number' ? provider.updatedAt : now,
   };

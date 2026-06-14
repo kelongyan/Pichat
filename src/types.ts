@@ -9,12 +9,15 @@ export interface Config {
 
 export type ThinkingLevel = 'low' | 'medium' | 'high' | 'xhigh';
 
+export type Protocol = 'responses' | 'images';
+
 export interface ProviderConfig {
   id: string;
   name: string;
   baseURL: string;
   apiKey: string;
   model: string;
+  protocol?: Protocol;
   createdAt: number;
   updatedAt: number;
 }
@@ -90,4 +93,27 @@ export interface GenerateImageResult {
   imageBase64: string | null;
   thinking: string | null;
   raw: unknown;
+}
+
+export interface BuildPayloadParams {
+  provider: ProviderConfig;
+  prompt: string;
+  size: string;
+  action: string;
+  images: string[];
+  thinking?: string;
+  history: Message[];
+  instructions: string;
+  stream: boolean;
+}
+
+export interface ProtocolAdapter {
+  buildPayload(params: BuildPayloadParams): unknown;
+  parseResponse(response: Response): Promise<GenerateImageResult>;
+  readStream?(response: Response, onStream: (delta: StreamDelta) => void): Promise<GenerateImageResult>;
+  getEndpoint(): string;
+  supportsStreaming: boolean;
+  supportsHistory: boolean;
+  supportsThinking: boolean;
+  supportsEditing: boolean;
 }

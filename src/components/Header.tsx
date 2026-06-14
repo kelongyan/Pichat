@@ -18,7 +18,6 @@ interface HeaderProps {
 const TABS = [
   { id: 'create', label: 'Create' },
   { id: 'gallery', label: 'Gallery' },
-  { id: 'waterfall', label: 'Waterfall' },
   { id: 'history', label: 'History' },
 ];
 
@@ -94,8 +93,12 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button className="header-icon-btn" onClick={() => navigate('/settings')}>
-          <Settings size={18} />
+        <button
+          className="header-settings-btn"
+          onClick={() => navigate('/settings')}
+        >
+          <Settings size={16} />
+          <span>Settings</span>
         </button>
       </div>
       <div className={`mobile-menu${menuOpen ? ' open' : ''}`}>
