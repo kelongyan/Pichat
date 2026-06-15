@@ -18,7 +18,6 @@ interface ResponseOutputItem {
 interface ParsedOutput {
   text: string | null;
   imageBase64: string | null;
-  thinking: string | null;
 }
 
 interface InputMessage {
@@ -36,24 +35,11 @@ interface ToolConfig {
   size?: string;
 }
 
-interface ReasoningConfig {
-  effort: string;
-  generate_summary?: string;
-}
-
 function parseResponseOutput(output: ResponseOutputItem[] | undefined): ParsedOutput {
   let text: string | null = null;
   let imageBase64: string | null = null;
-  let thinking: string | null = null;
 
   for (const item of output || []) {
-    if (item.type === 'reasoning' && item.summary) {
-      for (const part of item.summary) {
-        if (part.type === 'summary_text' && part.text) {
-          thinking = thinking ? thinking + '\n' + part.text : part.text;
-        }
-      }
-    }
     if (item.type === 'message' && item.content) {
       for (const part of item.content) {
         if (part.type === 'output_text' && part.text) {
@@ -72,7 +58,7 @@ function parseResponseOutput(output: ResponseOutputItem[] | undefined): ParsedOu
     }
   }
 
-  return { text, imageBase64, thinking };
+  return { text, imageBase64 };
 }
 
 function getMessageImageUrls(msg: Message): string[] {
@@ -116,7 +102,6 @@ function buildResponsesPayload({
   size,
   action,
   images,
-  thinking,
   history,
   instructions,
   stream,
@@ -127,16 +112,11 @@ function buildResponsesPayload({
   }
 
   const payload: Record<string, unknown> = {
-    model: provider.model || 'gpt-5.4',
+    model: provider.model || 'gpt-image-2',
     input: buildInput(prompt, images, history),
     tools: [tool],
     ...(instructions && { instructions }),
   };
-
-  if (thinking && thinking !== 'none') {
-    const reasoning: ReasoningConfig = { effort: thinking };
-    payload.reasoning = reasoning;
-  }
 
   if (stream) {
     payload.stream = true;
@@ -149,7 +129,6 @@ export function createResponsesAdapter(): ProtocolAdapter {
   return {
     supportsStreaming: true,
     supportsHistory: true,
-    supportsThinking: true,
     supportsEditing: true,
 
     getEndpoint: () => '/responses',
@@ -176,12 +155,11 @@ export function createResponsesAdapter(): ProtocolAdapter {
       const decoder = new TextDecoder();
       let buffer = '';
       let accText: string | null = null;
-      let accThinking: string | null = null;
       let accImage: string | null = null;
       let finalData: { response?: { output?: ResponseOutputItem[] }; output?: ResponseOutputItem[] } | null = null;
 
       const emit = (extra?: Partial<StreamDelta>) => {
-        onStream({ text: accText, thinking: accThinking, imageBase64: accImage, ...extra });
+        onStream({ text: accText, imageBase64: accImage, ...extra });
       };
 
       while (true) {
@@ -217,17 +195,19 @@ export function createResponsesAdapter(): ProtocolAdapter {
 
           eventType ||= typeof parsed.type === 'string' ? parsed.type : '';
 
-          if (eventType === 'response.output_text.delta') {
+          if (eventType === 'response.output_item.added') {
+            const item = parsed.item as Record<string, unknown> | undefined;
+            if (item?.type === 'image_generation_call') {
+              emit({ stage: 'generating' });
+            }
+          } else if (eventType === 'response.output_text.delta') {
             accText = (accText || '') + String(parsed.delta ?? '');
-            emit();
-          } else if (eventType === 'response.reasoning_summary_text.delta') {
-            accThinking = (accThinking || '') + String(parsed.delta ?? '');
             emit();
           } else if (eventType === 'response.image_generation_call.partial_image') {
             const partialImage = parsed.partial_image_b64;
             if (typeof partialImage === 'string') {
               accImage = partialImage;
-              emit();
+              emit({ stage: 'generating' });
             }
           } else if (eventType === 'response.output_item.done') {
             const item = parsed.item as Record<string, unknown> | undefined;
@@ -243,7 +223,7 @@ export function createResponsesAdapter(): ProtocolAdapter {
             }
           } else if (eventType === 'response.completed') {
             finalData = parsed as { response?: { output?: ResponseOutputItem[] }; output?: ResponseOutputItem[] };
-            emit({ done: true });
+            emit({ done: true, stage: 'complete' });
           } else if (eventType === 'response.failed') {
             const errObj = parsed.error as Record<string, unknown> | undefined;
             const failMsg = String(errObj?.message ?? 'Generation failed');
@@ -264,7 +244,6 @@ export function createResponsesAdapter(): ProtocolAdapter {
         return {
           text: result.text ?? accText,
           imageBase64: result.imageBase64 ?? accImage,
-          thinking: result.thinking ?? accThinking,
           raw: finalData,
         };
       }
@@ -273,7 +252,7 @@ export function createResponsesAdapter(): ProtocolAdapter {
         throw new Error('The API stream ended without content — the model may not support this request, or content was filtered.');
       }
 
-      return { text: accText, imageBase64: accImage, thinking: accThinking, raw: null };
+      return { text: accText, imageBase64: accImage, raw: null };
     },
   };
 }

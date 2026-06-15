@@ -87,10 +87,10 @@ The current date is {{CURRENT_DATE}}.
 
 # Platform
 
- - Model ID: \`gpt-2-image\`
+ - Model ID: \`gpt-image-2\`
  - Platform: Pichat
  - Developed by: MoYeRanQianZhi
- - Knowledge cutoff: 2025-08
+ - Knowledge cutoff: 2026-06
  - Context window: 1M`;
 
 export async function preloadSystemPrompt(): Promise<void> {
@@ -131,7 +131,6 @@ export async function generateImage({
   size = '1024x1024',
   action = 'auto',
   images = [],
-  thinking,
   providerId,
   onStream,
   history = [],
@@ -141,11 +140,6 @@ export async function generateImage({
   if (!config) throw new Error('Not configured');
   const provider = resolveProvider(config, providerId);
   const adapter = getProtocolAdapter(provider);
-
-  // 特性能力检查
-  if (thinking && thinking !== 'none' && !adapter.supportsThinking) {
-    thinking = undefined;
-  }
 
   if (action === 'edit' && images.length > 0 && !adapter.supportsEditing) {
     throw new Error(
@@ -160,7 +154,6 @@ export async function generateImage({
     size,
     action,
     images,
-    thinking,
     history,
     instructions,
     stream: !!onStream,
@@ -232,7 +225,7 @@ export async function generateImage({
     }
     // 降级：非流式请求，结果返回后一次性回调
     const result = await adapter.parseResponse(response!);
-    onStream({ text: result.text, thinking: result.thinking, imageBase64: result.imageBase64, done: true });
+    onStream({ text: result.text, imageBase64: result.imageBase64, done: true });
     return result;
   }
 

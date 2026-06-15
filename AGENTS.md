@@ -15,7 +15,7 @@
 
 ## API Layer
 - `src/lib/api.ts` posts to `${config.baseURL}/responses` (trailing slashes stripped). Handles error classification (CORS/auth/rate-limit), 120s timeout, auto-retry (max 2, exponential backoff) for non-streaming requests only.
-- `src/lib/protocols/responses.ts` builds Responses API payloads, parses JSON/SSE deltas. Default model `'gpt-5.4'` is applied here when `provider.model` is empty.
+- `src/lib/protocols/responses.ts` builds Responses API payloads, parses JSON/SSE deltas. Default model `'gpt-image-2'` is applied here when `provider.model` is empty.
 - `generateImage()` defaults `action: 'auto'`; **callers must pass `action: 'edit'` when `images[]` is non-empty** or the API ignores reference images. `Chat.tsx` enforces this.
 - Passing `onStream` callback enables streaming and disables retry logic (`maxAttempts = 1`).
 - Size `'auto'` is intentionally omitted from the tool payload in `protocols/responses.ts`.
@@ -42,4 +42,4 @@
 - Fonts loaded from Google Fonts in `index.html`.
 
 ## System Prompt
-- Keep `GPT2IMAGE.md` (repo root) and `public/assets/system-prompt.md` (runtime asset) synchronized when editing.
+- Keep `GPT2IMAGE.md` (repo root) and `public/assets/system-prompt.md` (runtime asset) and `src/lib/api.ts` (MINIMAL_PROMPT fallback) synchronized when editing.

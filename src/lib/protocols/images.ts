@@ -8,7 +8,6 @@ export function createImagesAdapter(): ProtocolAdapter {
   return {
     supportsStreaming: false,
     supportsHistory: false,
-    supportsThinking: false,
     supportsEditing: false,
 
     getEndpoint: () => '/images/generations',
@@ -50,7 +49,7 @@ export function createImagesAdapter(): ProtocolAdapter {
       const data = await response.json();
       const imageBase64 = data.data?.[0]?.b64_json || data.data?.[0]?.url || null;
       const text = data.data?.[0]?.revised_prompt || null;
-      return { text, imageBase64, thinking: null, raw: data };
+      return { text, imageBase64, raw: data };
     },
   };
 }

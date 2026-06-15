@@ -257,7 +257,7 @@ function createProviderFromLegacy(parsed: Record<string, unknown>): ProviderConf
     name: 'Default',
     baseURL,
     apiKey,
-    model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : 'gpt-5.4',
+    model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : 'gpt-image-2',
     protocol: 'responses' as const,
     createdAt: now,
     updatedAt: now,
@@ -280,7 +280,7 @@ function normalizeProvider(raw: unknown, index: number): ProviderConfig | null {
     apiKey,
     model: typeof provider.model === 'string' && provider.model.trim()
       ? provider.model.trim()
-      : 'gpt-5.4',
+      : 'gpt-image-2',
     protocol: (provider.protocol === 'responses' || provider.protocol === 'images')
       ? provider.protocol
       : 'responses' as const,
@@ -313,13 +313,6 @@ function normalizeConfig(parsed: Record<string, unknown>): Config | null {
   return {
     providers,
     defaultProviderId,
-    showThinking: typeof parsed.showThinking === 'boolean' ? parsed.showThinking : false,
-    thinkingLevel: parsed.thinkingLevel === 'medium'
-      || parsed.thinkingLevel === 'high'
-      || parsed.thinkingLevel === 'xhigh'
-      || parsed.thinkingLevel === 'low'
-      ? parsed.thinkingLevel
-      : 'low',
     darkMode: typeof parsed.darkMode === 'boolean' ? parsed.darkMode : false,
     useSystemPrompt: typeof parsed.useSystemPrompt === 'boolean' ? parsed.useSystemPrompt : true,
   };

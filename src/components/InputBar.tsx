@@ -28,6 +28,7 @@ export interface InputBarHandle {
   getProviderId: () => string;
   setImages: (imgs: string[]) => void;
   setText: (text: string) => void;
+  clear: () => void;
 }
 
 interface InputBarProps {
@@ -61,14 +62,25 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  function clampAndAlign(value: number): number {
+    const clamped = Math.min(4096, Math.max(256, value));
+    return Math.round(clamped / 16) * 16;
+  }
+
   function getSize() {
     if (selectedAspect === 'custom') {
-      const w = Math.min(4096, Math.max(256, parseInt(customW) || 1024));
-      const h = Math.min(4096, Math.max(256, parseInt(customH) || 1024));
+      const w = clampAndAlign(parseInt(customW) || 1024);
+      const h = clampAndAlign(parseInt(customH) || 1024);
       return `${w}x${h}`;
     }
     return resolveImageSize(selectedAspect, selectedResolution);
   }
+
+  const customWNum = parseInt(customW) || 0;
+  const customHNum = parseInt(customH) || 0;
+  const customWAligned = clampAndAlign(customWNum);
+  const customHAligned = clampAndAlign(customHNum);
+  const hasAlignWarning = (customW && customWNum !== customWAligned) || (customH && customHNum !== customHAligned);
 
   useImperativeHandle(
     ref,
@@ -77,6 +89,11 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
       getProviderId: () => providerId,
       setImages: (imgs: string[]) => setAttachedImages(imgs),
       setText: (t: string) => setText(t),
+      clear: () => {
+        setText('');
+        setAttachedImages([]);
+        if (textRef.current) textRef.current.style.height = 'auto';
+      },
     }),
     [providerId],
   );
@@ -110,9 +127,6 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
       providerId,
       images: [...attachedImages],
     });
-    setText('');
-    setAttachedImages([]);
-    if (textRef.current) textRef.current.style.height = 'auto';
   }
 
   function addImageFile(file: File | null | undefined) {
@@ -225,7 +239,11 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
               value={customH}
               onChange={(e) => setCustomH(e.target.value)}
             />
-            <span className="size-custom-hint">Divisible by 16</span>
+            <span className={`size-custom-hint${hasAlignWarning ? ' size-custom-hint-warn' : ''}`}>
+              {hasAlignWarning
+                ? `Will use ${customWAligned}x${customHAligned}`
+                : `${customWAligned}x${customHAligned}`}
+            </span>
           </div>
         )}
       </div>

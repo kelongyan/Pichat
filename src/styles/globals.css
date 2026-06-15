@@ -1000,6 +1000,11 @@ p {
   text-align: right;
 }
 
+.size-custom-hint-warn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ---- Input Bar ---- */
 .input-bar {
   display: flex;
@@ -1498,6 +1503,87 @@ p {
 @keyframes result-sheen {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+/* ---- Stream Phase Timeline & Timer ---- */
+.stream-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+.stream-phase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  transition: color var(--transition-normal);
+}
+
+.stream-phase.active {
+  color: var(--text-primary);
+}
+
+.stream-phase.done {
+  color: var(--text-secondary);
+}
+
+.stream-phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+  transition: all var(--transition-normal);
+}
+
+.stream-phase.active .stream-phase-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  animation: phase-pulse 1.5s infinite;
+}
+
+.stream-phase.done .stream-phase-dot {
+  background: var(--success);
+}
+
+.stream-phase-label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.stream-phase-duration {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.result-card-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timer-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--transition-fast);
+}
+
+@keyframes phase-pulse {
+  0%, 100% { box-shadow: 0 0 4px var(--accent); }
+  50% { box-shadow: 0 0 10px var(--accent), 0 0 20px color-mix(in srgb, var(--accent) 40%, transparent); }
 }
 
 /* ---- Markdown Body ---- */

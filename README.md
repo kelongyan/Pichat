@@ -36,7 +36,7 @@ npm run dev
 
 1. API Base URL，例如 `https://api.openai.com/v1`
 2. API Key
-3. Model，例如 `gpt-5.4`
+3. Model，例如 `gpt-image-2`
 
 保存后即可开始生成图片。
 

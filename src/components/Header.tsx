@@ -54,7 +54,7 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
   return (
     <div className="header" ref={headerRef}>
       <div className="header-logo" onClick={() => navigate('/create')} style={{ cursor: 'pointer' }}>
-        <img src="assets/OpenAI.png" alt="Pichat" className="header-logo-icon" />
+        <img src="assets/logo.png" alt="Pichat" className="header-logo-icon" />
         <span className="header-logo-text">Pichat</span>
       </div>
       <div className="header-actions">

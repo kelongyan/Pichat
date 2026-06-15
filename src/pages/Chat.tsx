@@ -13,7 +13,7 @@ import { buildImageActionPrompt, type ImageAction } from '../lib/imageActions';
 import { recordGenerationOutcome } from '../lib/providerStats';
 import { copyToClipboard } from '../lib/clipboard';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Conversation, Message, ProviderConfig, Variant } from '../types';
+import type { Conversation, Message, ProviderConfig, StreamStage, Variant } from '../types';
 
 function getVariants(msg: Message): Variant[] {
   if (msg.variants) return msg.variants;
@@ -39,26 +39,80 @@ function findPreviousUser(messages: Message[], fromIndex: number): Message | nul
   return null;
 }
 
-interface StreamState {
-  text: string | null;
-  thinking: string | null;
-  imageBase64: string | null;
-  done: boolean;
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
-// Isolated streaming bubble — owns its own render cycle
+interface StreamState {
+  text: string | null;
+  imageBase64: string | null;
+  done: boolean;
+  stage: StreamStage | null;
+  startedAt: number;
+}
+
+interface PhaseRecord {
+  phase: string;
+  startedAt: number;
+  endedAt?: number;
+}
+
+const PHASES = [
+  { key: 'generating' as const, label: 'Generating' },
+];
+
+// Isolated streaming bubble — owns its own render cycle with phase timeline + timer
 function StreamBubble({ streamRef }: { streamRef: React.RefObject<StreamState | null> }) {
   const [state, setState] = useState<StreamState | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const rafRef = useRef(0);
+  const phasesRef = useRef<PhaseRecord[]>([]);
+  const lastStageRef = useRef<StreamStage | null>(null);
 
   useEffect(() => {
     let active = true;
     const tick = () => {
       if (!active) return;
       const current = streamRef.current;
+      if (!current) {
+        setState((prev) => (prev ? null : prev));
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Track phase transitions
+      if (current.stage && current.stage !== lastStageRef.current) {
+        const phases = phasesRef.current;
+        // Close previous active phase
+        const now = performance.now();
+        for (let i = phases.length - 1; i >= 0; i--) {
+          if (!phases[i].endedAt) {
+            phases[i].endedAt = now;
+            break;
+          }
+        }
+        // Start new phase
+        phases.push({ phase: current.stage, startedAt: now });
+        lastStageRef.current = current.stage;
+      }
+
+      // If all phases done, close last one
+      if (current.done) {
+        const now = performance.now();
+        for (let i = phasesRef.current.length - 1; i >= 0; i--) {
+          if (!phasesRef.current[i].endedAt) {
+            phasesRef.current[i].endedAt = now;
+            break;
+          }
+        }
+      }
+
+      setElapsed(Math.round(performance.now() - current.startedAt));
+
       setState((prev) => {
-        if (!current) return prev ? null : prev;
-        if (prev && prev.text === current.text && prev.thinking === current.thinking && prev.imageBase64 === current.imageBase64) return prev;
+        if (prev && prev.text === current.text
+          && prev.imageBase64 === current.imageBase64 && prev.stage === current.stage) return prev;
         return { ...current };
       });
       rafRef.current = requestAnimationFrame(tick);
@@ -69,13 +123,44 @@ function StreamBubble({ streamRef }: { streamRef: React.RefObject<StreamState | 
 
   if (!state) return null;
 
+  const stageLabel = state.stage === 'generating' ? 'Generating'
+    : state.stage === 'complete' ? 'Complete'
+    : 'Starting';
+
   return (
     <div className="message message-ai">
       <div className="result-card result-card-stream">
         <div className="result-card-header">
-          <span className="result-card-kicker">Generating</span>
-          <span className="result-card-status"><span className="loading-dot" /> Working on image</span>
+          <span className="result-card-kicker">{stageLabel}</span>
+          <span className="result-card-timer">
+            <span className="timer-value">{formatDuration(elapsed)}</span>
+          </span>
         </div>
+
+        {/* Phase timeline */}
+        <div className="stream-timeline">
+          {PHASES.map((phase) => {
+            const record = phasesRef.current.find((r) => r.phase === phase.key);
+            const isActive = state.stage === phase.key;
+            const isDone = record?.endedAt != null && state.stage !== phase.key;
+            const duration = record ? formatDuration(
+              Math.round((record.endedAt ?? performance.now()) - record.startedAt)
+            ) : null;
+
+            let className = 'stream-phase';
+            if (isActive) className += ' active';
+            else if (isDone) className += ' done';
+
+            return (
+              <div key={phase.key} className={className}>
+                <span className="stream-phase-dot" />
+                <span className="stream-phase-label">{phase.label}</span>
+                {duration && <span className="stream-phase-duration">{duration}</span>}
+              </div>
+            );
+          })}
+        </div>
+
         {state.imageBase64 ? (
           <div className="result-image-frame">
             <img
@@ -147,7 +232,7 @@ const MessageBubble = memo(function MessageBubble({
           <div className="result-card-header">
             <span className="result-card-kicker">Result</span>
             <span className="result-card-meta">
-              {[variant.providerName, variant.size].filter(Boolean).join(' · ')}
+              {[variant.providerName, variant.size, variant.durationMs ? formatDuration(variant.durationMs) : null].filter(Boolean).join(' · ')}
             </span>
           </div>
           {hasImage && (
@@ -315,7 +400,7 @@ export default function Chat() {
     if (isGenerating) return null;
     setIsGenerating(true);
     const startedAt = performance.now();
-    streamRef.current = { text: null, thinking: null, imageBase64: null, done: false };
+    streamRef.current = { text: null, imageBase64: null, done: false, stage: null, startedAt };
     setShowStream(true);
     scrollToBottom();
 
@@ -326,7 +411,6 @@ export default function Chat() {
       const result = await generateImage({
         prompt: args.prompt,
         size: args.size,
-        thinking: config?.thinkingLevel || 'low',
         providerId: args.providerId,
         action: args.action,
         images: args.images,
@@ -335,9 +419,10 @@ export default function Chat() {
         onStream: (delta) => {
           streamRef.current = {
             text: delta.text,
-            thinking: delta.thinking,
             imageBase64: delta.imageBase64,
             done: !!delta.done,
+            stage: delta.stage || streamRef.current?.stage || null,
+            startedAt,
           };
           if (isNearBottom()) scrollToBottom();
         },
@@ -360,12 +445,12 @@ export default function Chat() {
           text: result.text || undefined,
           imageId,
           imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
-          thinking: result.thinking || undefined,
           providerId: args.provider?.id,
           providerName: args.provider?.name,
           model: args.provider?.model,
           size: args.size || 'auto',
           timestamp: Date.now(),
+          durationMs: Math.round(performance.now() - startedAt),
         },
       };
     } catch (err: unknown) {
@@ -417,6 +502,9 @@ export default function Chat() {
     setConversation(updatedConv);
     await convStore.save(updatedConv);
     scrollToBottom();
+
+    // 清空输入栏（发送成功后）
+    inputRef.current?.clear();
 
     const historyMessages = updatedConv.messages.slice(0, -1);
     const result = await runGeneration({

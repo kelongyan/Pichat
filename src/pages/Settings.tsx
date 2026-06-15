@@ -33,7 +33,7 @@ function createProvider(name = 'New Provider'): ProviderConfig {
     name,
     baseURL: '',
     apiKey: '',
-    model: 'gpt-5.4',
+    model: 'gpt-image-2',
     protocol: 'responses',
     createdAt: now,
     updatedAt: now,
@@ -46,7 +46,7 @@ function sanitizeProvider(provider: ProviderConfig): ProviderConfig {
     name: provider.name.trim() || 'Untitled Provider',
     baseURL: provider.baseURL.trim(),
     apiKey: provider.apiKey.trim(),
-    model: provider.model.trim() || 'gpt-5.4',
+    model: provider.model.trim() || 'gpt-image-2',
     updatedAt: Date.now(),
   };
 }
@@ -95,14 +95,14 @@ function ConnectView() {
   const [providerName, setProviderName] = useState('Default');
   const [baseURL, setBaseURL] = useState('https://api.openai.com/v1');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('gpt-5.4');
+  const [model, setModel] = useState('gpt-image-2');
   const [connecting, setConnecting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const b = baseURL.trim();
     const k = apiKey.trim();
-    const m = model.trim() || 'gpt-5.4';
+    const m = model.trim() || 'gpt-image-2';
     const n = providerName.trim() || 'Default';
 
     if (!b || !k) { showToast('Please fill in all required fields', { type: 'error' }); return; }
@@ -116,8 +116,6 @@ function ConnectView() {
       saveConfig({
         providers: [provider],
         defaultProviderId: provider.id,
-        showThinking: false,
-        thinkingLevel: 'low',
         darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
         useSystemPrompt: true,
       });
@@ -137,7 +135,7 @@ function ConnectView() {
       </a>
       <div className="view-centered fade-in">
         <div className="settings-view">
-          <img src="assets/OpenAI.png" alt="Pichat" className="settings-logo" />
+          <img src="assets/logo.png" alt="Pichat" className="settings-logo" />
           <h2 className="settings-title">Configure Pichat</h2>
           <p className="settings-subtitle">Connect to an OpenAI-compatible API endpoint</p>
           <form onSubmit={handleSubmit}>
@@ -155,7 +153,7 @@ function ConnectView() {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="model">Model</label>
-              <input className="form-input" id="model" type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-5.4" />
+              <input className="form-input" id="model" type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-image-2" />
             </div>
             <button className="btn-primary" type="submit" disabled={connecting}>
               {connecting ? 'Connecting...' : 'Connect'}
@@ -177,7 +175,6 @@ function FullSettings({ config }: { config: Config }) {
     config.providers.length ? config.providers : [createProvider('Default')]
   );
   const [defaultProviderId, setDefaultProviderId] = useState(config.defaultProviderId || config.providers[0]?.id || '');
-  const [showThinking, setShowThinking] = useState(!!config.showThinking);
   const [useSystemPrompt, setUseSystemPrompt] = useState(config.useSystemPrompt !== false);
   const [testingId, setTestingId] = useState('');
   const [templates, setTemplates] = useState<PromptTemplate[]>(() => loadCustomPromptTemplates());
@@ -243,7 +240,7 @@ function FullSettings({ config }: { config: Config }) {
       }
       const data = raw as PichatExportData;
       await importPichatData(data);
-      if (data.config) { setProviders(data.config.providers); setDefaultProviderId(data.config.defaultProviderId); setShowThinking(data.config.showThinking); setUseSystemPrompt(data.config.useSystemPrompt !== false); }
+      if (data.config) { setProviders(data.config.providers); setDefaultProviderId(data.config.defaultProviderId); setUseSystemPrompt(data.config.useSystemPrompt !== false); }
       setTemplates(loadCustomPromptTemplates());
       refreshProviderStats();
       showToast('Import complete', { type: 'success' });
@@ -278,7 +275,7 @@ function FullSettings({ config }: { config: Config }) {
     const sanitized = providers.map(sanitizeProvider);
     for (const p of sanitized) { const e = validateProvider(p); if (e) { showToast(e, { type: 'error' }); return; } }
     const defaultId = sanitized.some((p) => p.id === defaultProviderId) ? defaultProviderId : sanitized[0].id;
-    saveConfig({ providers: sanitized, defaultProviderId: defaultId, showThinking, thinkingLevel: config.thinkingLevel || 'low', darkMode: config.darkMode ?? false, useSystemPrompt });
+    saveConfig({ providers: sanitized, defaultProviderId: defaultId, darkMode: config.darkMode ?? false, useSystemPrompt });
     setProviders(sanitized);
     setDefaultProviderId(defaultId);
     showToast('Settings saved', { type: 'success' });
@@ -326,7 +323,7 @@ function FullSettings({ config }: { config: Config }) {
                       </div>
                       <div className="form-group">
                         <label className="form-label">Model</label>
-                        <input className="form-input" type="text" value={provider.model} onChange={(e) => updateProvider(provider.id, { model: e.target.value })} placeholder="gpt-5.4" />
+                        <input className="form-input" type="text" value={provider.model} onChange={(e) => updateProvider(provider.id, { model: e.target.value })} placeholder="gpt-image-2" />
                       </div>
                     </div>
                     <div className="form-group">
@@ -369,16 +366,6 @@ function FullSettings({ config }: { config: Config }) {
 
           <div className="settings-card">
             <div className="settings-card-title">Preferences</div>
-            <div className="settings-toggle-row">
-              <div className="settings-toggle-info">
-                <span className="settings-toggle-name">Show thinking</span>
-                <span className="settings-toggle-desc">Display model reasoning in a collapsible block</span>
-              </div>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={showThinking} onChange={(e) => setShowThinking(e.target.checked)} />
-                <span className="toggle-slider" />
-              </label>
-            </div>
             <div className="settings-toggle-row">
               <div className="settings-toggle-info">
                 <span className="settings-toggle-name">System prompt</span>

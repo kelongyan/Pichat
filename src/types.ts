@@ -1,13 +1,9 @@
 export interface Config {
   providers: ProviderConfig[];
   defaultProviderId: string;
-  showThinking: boolean;
-  thinkingLevel: ThinkingLevel;
   darkMode: boolean;
   useSystemPrompt: boolean;
 }
-
-export type ThinkingLevel = 'low' | 'medium' | 'high' | 'xhigh';
 
 export type Protocol = 'responses' | 'images';
 
@@ -48,12 +44,12 @@ export interface Variant {
   text?: string;
   imageBase64?: string;
   imageId?: string;
-  thinking?: string;
   providerId?: string;
   providerName?: string;
   model?: string;
   size: string;
   timestamp: number;
+  durationMs?: number;
 }
 
 export interface GalleryImage {
@@ -69,11 +65,13 @@ export interface GalleryImage {
   timestamp: number;
 }
 
+export type StreamStage = 'generating' | 'complete';
+
 export interface StreamDelta {
   text: string | null;
-  thinking: string | null;
   imageBase64: string | null;
   done?: boolean;
+  stage?: StreamStage;
 }
 
 export interface GenerateImageParams {
@@ -81,7 +79,6 @@ export interface GenerateImageParams {
   size?: string;
   action?: string;
   images?: string[];
-  thinking?: string;
   providerId?: string;
   onStream?: (delta: StreamDelta) => void;
   history?: Message[];
@@ -91,7 +88,6 @@ export interface GenerateImageParams {
 export interface GenerateImageResult {
   text: string | null;
   imageBase64: string | null;
-  thinking: string | null;
   raw: unknown;
 }
 
@@ -101,7 +97,6 @@ export interface BuildPayloadParams {
   size: string;
   action: string;
   images: string[];
-  thinking?: string;
   history: Message[];
   instructions: string;
   stream: boolean;
@@ -114,6 +109,5 @@ export interface ProtocolAdapter {
   getEndpoint(): string;
   supportsStreaming: boolean;
   supportsHistory: boolean;
-  supportsThinking: boolean;
   supportsEditing: boolean;
 }
