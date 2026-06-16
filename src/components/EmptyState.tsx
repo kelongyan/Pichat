@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import styles from './EmptyState.module.css';
 
 interface EmptyStateProps {
   icon: ReactNode;
@@ -8,13 +9,13 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, subtitle }: EmptyStateProps) {
   return (
-    <div className="landing fade-in">
-      <div style={{ color: 'var(--text-muted)', fontSize: 48, marginBottom: 16 }}>
+    <div className={`${styles.container} fade-in`}>
+      <div className={styles.emptyIcon}>
         {icon}
       </div>
-      <p style={{ color: 'var(--text-tertiary)', fontSize: 15 }}>{title}</p>
+      <p className={styles.emptyTitle}>{title}</p>
       {subtitle && (
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
+        <p className={styles.emptySubtitle}>
           {subtitle}
         </p>
       )}

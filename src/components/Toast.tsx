@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import styles from './Toast.module.css';
 
 export type ToastType = 'info' | 'success' | 'error';
 
@@ -90,18 +91,18 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
 
   const icons: Record<ToastType, string> = {
     info: 'i',
-    success: '✓',
+    success: '\u2713',
     error: '!',
   };
 
   return (
-    <div className="toast-container">
+    <div className={styles.container}>
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`toast ${t.type}${t.show ? ' show' : ''}`}
+          className={`${styles.toast} ${t.type === 'success' ? styles.success : t.type === 'error' ? styles.error : ''}${t.show ? ` ${styles.show}` : ''}`}
         >
-          <span className="toast-icon" aria-hidden="true">{icons[t.type]}</span>
+          <span className={styles.icon} aria-hidden="true">{icons[t.type]}</span>
           <span>{t.message}</span>
         </div>
       ))}

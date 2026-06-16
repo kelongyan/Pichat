@@ -1,0 +1,115 @@
+.imageCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-whisper);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.imageCard:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
+}
+
+.imageCard img {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-lg);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 20, 19, 0.35);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  display: flex;
+}
+
+.imageCard:hover .overlay {
+  opacity: 1;
+}
+
+.badge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: var(--space-1) 10px;
+  background: rgba(20, 20, 19, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+.cardBtn {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  background: rgba(25, 25, 24, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.cardBtn:hover {
+  background: var(--bg-primary);
+  transform: scale(1.05);
+}
+
+.cardBtn:active {
+  transform: scale(0.95);
+}
+
+.download {
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.actionStack {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  right: 56px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.actionStack .cardBtn {
+  position: static;
+  width: auto;
+  height: 30px;
+  padding: 0 10px;
+  gap: 5px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.edit {
+  bottom: var(--space-3);
+  left: var(--space-3);
+  width: auto;
+  padding: 0 14px;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+
+.fullscreen {
+  bottom: var(--space-3);
+  right: var(--space-3);
+}

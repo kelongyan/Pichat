@@ -1,0 +1,217 @@
+.extraToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  margin-bottom: 2px;
+}
+
+.extraToggle:hover {
+  color: var(--text-secondary);
+}
+
+.extraToggle svg {
+  transition: transform 0.2s ease;
+}
+
+.extraToggleOpen svg {
+  transform: rotate(180deg);
+}
+
+.extra {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.2s ease;
+  margin-bottom: 0;
+}
+
+.extraOpen {
+  max-height: 200px;
+  opacity: 1;
+  margin-bottom: var(--space-3);
+}
+
+/* Reference Preview */
+.referencePreview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: 0 0 10px;
+}
+
+.referenceThumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.referenceThumb {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  padding: 0;
+  box-shadow: var(--shadow-whisper);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.referenceThumb:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.referenceThumb:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.referenceThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.referenceCopy {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 180px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.referenceTitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.referenceHint {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+/* Input Bar */
+.inputBar {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-3);
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-whisper);
+  position: relative;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.inputBar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring), var(--shadow-whisper);
+}
+
+.textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.attachBtn {
+  width: 36px;
+  height: 36px;
+  border: 1px dashed var(--ring);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  background: transparent;
+}
+
+.attachBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.sendBtn {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-on-accent);
+  cursor: pointer;
+  border: none;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sendBtn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.03);
+}
+
+.sendBtn:active {
+  transform: scale(0.97);
+}
+
+.sendBtn:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: default;
+  transform: none;
+}
+
+.stopBtn {
+  width: 36px;
+  height: 36px;
+  background: var(--error);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-on-accent);
+  cursor: pointer;
+  border: none;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.stopBtn:hover {
+  background: #8f2929;
+  transform: scale(1.03);
+}
+
+.stopBtn:active {
+  transform: scale(0.97);
+}

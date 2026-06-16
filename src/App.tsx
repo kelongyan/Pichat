@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import { LightboxProvider } from './components/Lightbox';
-import { useConfigStore, initStore } from './lib/store';
+import { useConfigStore, initStore, ensureGalleryIndexBackfilled } from './lib/store';
 import { useThemeStore } from './lib/theme';
 import { preloadSystemPrompt } from './lib/api';
 import Landing from './pages/Landing';
@@ -39,7 +39,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    initStore().then(() => {
+    initStore(ensureGalleryIndexBackfilled).then(() => {
       if (cancelled) return;
       loadConfig();
       applyTheme();

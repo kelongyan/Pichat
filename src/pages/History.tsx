@@ -7,6 +7,7 @@ import { useConversationStore } from '../lib/store';
 import { toImageDataUrl } from '../lib/imageStore';
 import { useLazyImage } from '../hooks/useLazyImage';
 import type { Conversation, Message } from '../types';
+import styles from './History.module.css';
 
 interface ThumbInfo {
   imageId?: string;
@@ -80,7 +81,7 @@ export default function History() {
         />
       )}
       {loaded && items.length > 0 && (
-        <div className="history-list fade-in">
+        <div className={`${styles.list} fade-in`}>
           {items.map((conv) => {
             const firstUser = conv.messages.find((m) => m.role === 'user');
             if (!firstUser) return null;
@@ -88,18 +89,18 @@ export default function History() {
             return (
               <div
                 key={conv.id}
-                className="history-item"
+                className={styles.item}
                 onClick={() => navigate('/chat', { state: { conversationId: conv.id } })}
               >
-                <div className="history-thumb">
+                <div className={styles.thumb}>
                   {thumbInfo && <ThumbImage info={thumbInfo} />}
                 </div>
-                <div className="history-text">
-                  <div className="history-prompt">{firstUser.text}</div>
-                  <div className="history-time">{formatTime(conv.createdAt)}</div>
+                <div className={styles.text}>
+                  <div className={styles.prompt}>{firstUser.text}</div>
+                  <div className={styles.time}>{formatTime(conv.createdAt)}</div>
                 </div>
                 <button
-                  className="history-delete"
+                  className={styles.deleteBtn}
                   title="Delete conversation"
                   onClick={(e) => handleDelete(e, conv)}
                 >

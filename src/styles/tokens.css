@@ -1,0 +1,111 @@
+/* =======================================================
+   Pichat — Design Tokens
+   暖色羊皮纸 · 优雅衬线排版 · 极简环形层级
+   ======================================================= */
+
+:root {
+  /* Colors - Light Theme (default) */
+  --bg-primary: #f5f4ed;
+  --bg-secondary: #faf9f5;
+  --bg-tertiary: #e8e6dc;
+  --bg-hover: #e3e1d5;
+  --bg-chat-user: #e8e6dc;
+  --bg-chat-ai: #faf9f5;
+
+  --border: #f0eee6;
+  --border-strong: #e8e6dc;
+  --border-subtle: #f9f8f3;
+
+  --text-primary: #141413;
+  --text-secondary: #5e5d59;
+  --text-tertiary: #87867f;
+  --text-muted: #b0aea5;
+  --text-on-accent: #faf9f5;
+
+  --accent: #c96442;
+  --accent-hover: #b55333;
+  --accent-light: #fbeee9;
+  --accent-coral: #d97757;
+
+  --error: #b53333;
+  --error-light: #fbeaea;
+  --success: #2f8f5b;
+  --success-light: #edf8f1;
+  --focus-ring: rgba(56, 152, 236, 0.4);
+
+  --ring: #d1cfc5;
+
+  /* Shadows */
+  --shadow-sm: 0 0 0 1px var(--border-strong);
+  --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(20, 20, 19, 0.02);
+  --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(20, 20, 19, 0.04);
+  --shadow-whisper: 0 4px 24px rgba(20, 20, 19, 0.03);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Font sizes */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 28px;
+  --font-size-2xl: 44px;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Libre Baskerville', 'Noto Serif SC', Georgia, serif;
+  --font-mono: 'Courier New', Courier, monospace;
+
+  /* Transitions */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: #141413;
+  --bg-secondary: #222220;
+  --bg-tertiary: #30302e;
+  --bg-hover: #3d3d3b;
+  --bg-chat-user: #30302e;
+  --bg-chat-ai: #222220;
+
+  --border: #30302e;
+  --border-strong: #3d3d3b;
+  --border-subtle: #1c1c1b;
+
+  --text-primary: #faf9f5;
+  --text-secondary: #b0aea5;
+  --text-tertiary: #87867f;
+  --text-muted: #5e5d59;
+  --text-on-accent: #faf9f5;
+
+  --accent: #d97757;
+  --accent-hover: #c96442;
+  --accent-light: #2d1d18;
+  --error-light: #351818;
+  --success: #54c582;
+  --success-light: #153522;
+
+  --ring: #3d3d3b;
+  --shadow-sm: 0 0 0 1px var(--border-strong);
+  --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.25);
+  --shadow-whisper: 0 4px 24px rgba(0, 0, 0, 0.2);
+}

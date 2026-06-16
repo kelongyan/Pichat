@@ -1,0 +1,66 @@
+.container {
+  position: fixed;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3);
+  font-size: 14.5px;
+  color: var(--text-primary);
+  transform: translateX(120%);
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.show {
+  transform: translateX(0);
+}
+
+.success {
+  border-left-color: var(--success);
+  background: color-mix(in srgb, var(--success-light) 42%, var(--bg-secondary));
+}
+
+.success .icon {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.error {
+  border-left-color: var(--error);
+  color: var(--error);
+  background: color-mix(in srgb, var(--error-light) 36%, var(--bg-secondary));
+}
+
+.error .icon {
+  background: var(--error-light);
+  color: var(--error);
+}

@@ -1,0 +1,88 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  gap: var(--space-2);
+}
+
+.item {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.item:hover {
+  background: var(--bg-hover);
+  transform: translateX(3px);
+  border-color: var(--border-strong);
+}
+
+.thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.text {
+  flex: 1;
+  overflow: hidden;
+}
+
+.prompt {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+  font-family: var(--font-sans);
+}
+
+.deleteBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  background: transparent;
+  border: none;
+}
+
+.item:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background: var(--accent-light);
+  color: var(--error);
+}

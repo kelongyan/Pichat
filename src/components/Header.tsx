@@ -9,6 +9,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { useThemeStore } from '../lib/theme';
+import styles from './Header.module.css';
 
 interface HeaderProps {
   activeTab?: string;
@@ -52,23 +53,23 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
   }
 
   return (
-    <div className="header" ref={headerRef}>
-      <div className="header-logo" onClick={() => navigate('/create')} style={{ cursor: 'pointer' }}>
-        <img src="assets/logo.png" alt="Pichat" className="header-logo-icon" />
-        <span className="header-logo-text">Pichat</span>
+    <div className={styles.header} ref={headerRef}>
+      <div className={styles.logo} onClick={() => navigate('/create')}>
+        <img src="assets/logo.png" alt="Pichat" className={styles.logoIcon} />
+        <span className={styles.logoText}>Pichat</span>
       </div>
-      <div className="header-actions">
+      <div className={styles.actions}>
         {showNewChat && (
-          <button className="header-btn" onClick={() => handleTab('create')}>
+          <button className={styles.btn} onClick={() => handleTab('create')}>
             <PlusCircle size={16} />
-            <span className="header-btn-label">New</span>
+            <span className={styles.btnLabel}>New</span>
           </button>
         )}
-        <div className="header-tabs">
+        <div className={styles.tabs}>
           {TABS.map((t) => (
             <div
               key={t.id}
-              className={`tab${t.id === activeTab ? ' active' : ''}`}
+              className={`${styles.tab}${t.id === activeTab ? ` ${styles.tabActive}` : ''}`}
               onClick={() => handleTab(t.id)}
             >
               {t.label}
@@ -76,7 +77,7 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
           ))}
         </div>
         <button
-          className="header-icon-btn"
+          className={styles.iconBtn}
           data-action="menu"
           title="Menu"
           onClick={(e) => {
@@ -87,32 +88,32 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <button
-          className="header-icon-btn"
+          className={styles.iconBtn}
           title={darkMode ? 'Light mode' : 'Dark mode'}
           onClick={handleThemeToggle}
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button
-          className="header-settings-btn"
+          className={styles.settingsBtn}
           onClick={() => navigate('/settings')}
         >
           <Settings size={16} />
           <span>Settings</span>
         </button>
       </div>
-      <div className={`mobile-menu${menuOpen ? ' open' : ''}`}>
+      <div className={`${styles.mobileMenu}${menuOpen ? ` ${styles.mobileMenuOpen}` : ''}`}>
         {TABS.map((t) => (
           <div
             key={t.id}
-            className={`mobile-menu-item${t.id === activeTab ? ' active' : ''}`}
+            className={`${styles.mobileMenuItem}${t.id === activeTab ? ` ${styles.mobileMenuItemActive}` : ''}`}
             onClick={() => handleTab(t.id)}
           >
             {t.label}
           </div>
         ))}
       </div>
-      <div className="header-gradient-line" />
+      <div className={styles.gradientLine} />
     </div>
   );
 }

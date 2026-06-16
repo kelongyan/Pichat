@@ -1,291 +1,21 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { InputBar } from '../components/InputBar';
 import type { InputBarHandle, SendData } from '../components/InputBar';
-import { ImageCard } from '../components/ImageCard';
 import { useLightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
 import { generateImage } from '../lib/api';
-import { saveImage, toImageDataUrl } from '../lib/imageStore';
+import { saveImage } from '../lib/imageStore';
 import { useConfigStore, useConversationStore, generateId } from '../lib/store';
 import { buildImageActionPrompt, type ImageAction } from '../lib/imageActions';
 import { recordGenerationOutcome } from '../lib/providerStats';
 import { copyToClipboard } from '../lib/clipboard';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Conversation, Message, ProviderConfig, StreamStage, Variant } from '../types';
-
-function getVariants(msg: Message): Variant[] {
-  if (msg.variants) return msg.variants;
-  if (msg.imageBase64) return [{ imageBase64: msg.imageBase64, size: msg.size || 'auto', timestamp: msg.timestamp }];
-  return [];
-}
-
-function getActiveVariant(msg: Message): Variant | null {
-  const variants = getVariants(msg);
-  const idx = msg.activeVariant || 0;
-  return variants[idx] || variants[0] || null;
-}
-
-function getReferenceImages(msg: Message): string[] {
-  if (msg.imageDataUrls?.length) return msg.imageDataUrls;
-  return msg.imageDataUrl ? [msg.imageDataUrl] : [];
-}
-
-function findPreviousUser(messages: Message[], fromIndex: number): Message | null {
-  for (let i = fromIndex - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') return messages[i];
-  }
-  return null;
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-interface StreamState {
-  text: string | null;
-  imageBase64: string | null;
-  done: boolean;
-  stage: StreamStage | null;
-  startedAt: number;
-}
-
-interface PhaseRecord {
-  phase: string;
-  startedAt: number;
-  endedAt?: number;
-}
-
-const PHASES = [
-  { key: 'generating' as const, label: 'Generating' },
-];
-
-// Isolated streaming bubble — owns its own render cycle with phase timeline + timer
-function StreamBubble({ streamRef }: { streamRef: React.RefObject<StreamState | null> }) {
-  const [state, setState] = useState<StreamState | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const rafRef = useRef(0);
-  const phasesRef = useRef<PhaseRecord[]>([]);
-  const lastStageRef = useRef<StreamStage | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const tick = () => {
-      if (!active) return;
-      const current = streamRef.current;
-      if (!current) {
-        setState((prev) => (prev ? null : prev));
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // Track phase transitions
-      if (current.stage && current.stage !== lastStageRef.current) {
-        const phases = phasesRef.current;
-        // Close previous active phase
-        const now = performance.now();
-        for (let i = phases.length - 1; i >= 0; i--) {
-          if (!phases[i].endedAt) {
-            phases[i].endedAt = now;
-            break;
-          }
-        }
-        // Start new phase
-        phases.push({ phase: current.stage, startedAt: now });
-        lastStageRef.current = current.stage;
-      }
-
-      // If all phases done, close last one
-      if (current.done) {
-        const now = performance.now();
-        for (let i = phasesRef.current.length - 1; i >= 0; i--) {
-          if (!phasesRef.current[i].endedAt) {
-            phasesRef.current[i].endedAt = now;
-            break;
-          }
-        }
-      }
-
-      setElapsed(Math.round(performance.now() - current.startedAt));
-
-      setState((prev) => {
-        if (prev && prev.text === current.text
-          && prev.imageBase64 === current.imageBase64 && prev.stage === current.stage) return prev;
-        return { ...current };
-      });
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { active = false; cancelAnimationFrame(rafRef.current); };
-  }, [streamRef]);
-
-  if (!state) return null;
-
-  const stageLabel = state.stage === 'generating' ? 'Generating'
-    : state.stage === 'complete' ? 'Complete'
-    : 'Starting';
-
-  return (
-    <div className="message message-ai">
-      <div className="result-card result-card-stream">
-        <div className="result-card-header">
-          <span className="result-card-kicker">{stageLabel}</span>
-          <span className="result-card-timer">
-            <span className="timer-value">{formatDuration(elapsed)}</span>
-          </span>
-        </div>
-
-        {/* Phase timeline */}
-        <div className="stream-timeline">
-          {PHASES.map((phase) => {
-            const record = phasesRef.current.find((r) => r.phase === phase.key);
-            const isActive = state.stage === phase.key;
-            const isDone = record?.endedAt != null && state.stage !== phase.key;
-            const duration = record ? formatDuration(
-              Math.round((record.endedAt ?? performance.now()) - record.startedAt)
-            ) : null;
-
-            let className = 'stream-phase';
-            if (isActive) className += ' active';
-            else if (isDone) className += ' done';
-
-            return (
-              <div key={phase.key} className={className}>
-                <span className="stream-phase-dot" />
-                <span className="stream-phase-label">{phase.label}</span>
-                {duration && <span className="stream-phase-duration">{duration}</span>}
-              </div>
-            );
-          })}
-        </div>
-
-        {state.imageBase64 ? (
-          <div className="result-image-frame">
-            <img
-              src={toImageDataUrl(state.imageBase64)}
-              alt=""
-              className="stream-image"
-            />
-          </div>
-        ) : (
-          <div className="result-image-skeleton">
-            <div className="result-image-sheen" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Memoized individual message bubble
-const MessageBubble = memo(function MessageBubble({
-  msg,
-  index,
-  isGenerating,
-  onRetry,
-  onVariantChange,
-  onEdit,
-  onFullscreen,
-  onCopyPrompt,
-  onImageAction,
-  prompt,
-}: {
-  msg: Message;
-  index: number;
-  isGenerating: boolean;
-  onRetry: (idx: number) => void;
-  onVariantChange: (idx: number, dir: -1 | 1) => void;
-  onEdit: (src: string) => void;
-  onFullscreen: (src: string, prompt: string) => void;
-  onCopyPrompt: (prompt: string) => void;
-  onImageAction: (action: Exclude<ImageAction, 'copy'>, src: string, prompt: string) => void;
-  prompt: string;
-}) {
-  const variant = getActiveVariant(msg);
-  const variants = getVariants(msg);
-  const hasImage = !!(variant?.imageId || variant?.imageBase64);
-
-  return (
-    <div className="message message-ai">
-      {msg.error ? (
-        <div className="result-card result-card-error">
-          <div className="result-card-header">
-            <span className="result-card-kicker">Generation failed</span>
-          </div>
-          <div className="bubble-ai-error">{msg.error}</div>
-          <div className="message-actions">
-            <button
-              className="message-retry"
-              title="Retry generation"
-              disabled={isGenerating}
-              onClick={() => onRetry(index)}
-            >
-              <RefreshCw size={16} />
-              <span>Retry</span>
-            </button>
-          </div>
-        </div>
-      ) : variant ? (
-        <div className={`result-card${hasImage ? ' result-card-image' : ''}`}>
-          <div className="result-card-header">
-            <span className="result-card-kicker">Result</span>
-            <span className="result-card-meta">
-              {[variant.providerName, variant.size, variant.durationMs ? formatDuration(variant.durationMs) : null].filter(Boolean).join(' · ')}
-            </span>
-          </div>
-          {hasImage && (
-            <div className="result-image-frame">
-              <ImageCard
-                imageId={variant.imageId}
-                imageBase64={variant.imageBase64}
-                size={variant.size}
-                prompt={prompt}
-                timestamp={variant.timestamp}
-                onEdit={onEdit}
-                onFullscreen={(src) => onFullscreen(src, prompt)}
-                onCopyPrompt={prompt ? () => onCopyPrompt(prompt) : undefined}
-                onAction={(action, src) => onImageAction(action, src, prompt)}
-              />
-            </div>
-          )}
-
-          <div className="message-actions">
-            {variants.length > 1 && (
-              <div className="variant-nav">
-                <button
-                  className="variant-nav-btn"
-                  disabled={isGenerating || (msg.activeVariant || 0) === 0}
-                  onClick={() => onVariantChange(index, -1)}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span>{(msg.activeVariant || 0) + 1} / {variants.length}</span>
-                <button
-                  className="variant-nav-btn"
-                  disabled={isGenerating || (msg.activeVariant || 0) >= variants.length - 1}
-                  onClick={() => onVariantChange(index, 1)}
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            )}
-            <button
-              className="message-retry"
-              title={msg.error ? 'Retry generation' : 'Generate another variant'}
-              disabled={isGenerating}
-              onClick={() => onRetry(index)}
-            >
-              <RefreshCw size={16} />
-              <span>Regenerate</span>
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-});
+import type { Conversation, Message, ProviderConfig, Variant } from '../types';
+import { StreamBubble } from './StreamBubble';
+import { MessageBubble } from './MessageBubble';
+import { getReferenceImages, findPreviousUser, type StreamState } from './chatUtils';
+import styles from './Chat.module.css';
 
 export default function Chat() {
   const location = useLocation();
@@ -503,7 +233,6 @@ export default function Chat() {
     await convStore.save(updatedConv);
     scrollToBottom();
 
-    // 清空输入栏（发送成功后）
     inputRef.current?.clear();
 
     const historyMessages = updatedConv.messages.slice(0, -1);
@@ -545,7 +274,7 @@ export default function Chat() {
     setRetryingIdx(msgIdx);
 
     const refImages = getReferenceImages(userMsg);
-    const activeVariant = getActiveVariant(msg);
+    const activeVariant = msg.variants?.[msg.activeVariant || 0] || msg.variants?.[0] || null;
     const retrySize = activeVariant?.size || 'auto';
     const retryProviderId = activeVariant?.providerId
       || inputRef.current?.getProviderId()
@@ -567,9 +296,7 @@ export default function Chat() {
       errorTarget: conversation,
     });
 
-    if (!result) {
-      return;
-    }
+    if (!result) return;
 
     const updatedConv = { ...conversation };
     updatedConv.messages = [...updatedConv.messages];
@@ -583,7 +310,7 @@ export default function Chat() {
         timestamp: Date.now(),
       };
     } else {
-      const variants = [...getVariants(updatedMsg), result.variant];
+      const variants = [...(updatedMsg.variants || []), result.variant];
       updatedMsg.variants = variants;
       updatedMsg.imageBase64 = undefined;
       updatedMsg.size = undefined;
@@ -599,7 +326,7 @@ export default function Chat() {
     const updatedConv = { ...conversation };
     updatedConv.messages = [...updatedConv.messages];
     const msg = { ...updatedConv.messages[msgIdx] };
-    const variants = getVariants(msg);
+    const variants = msg.variants || [];
     const current = msg.activeVariant || 0;
     msg.activeVariant = Math.max(0, Math.min(variants.length - 1, current + direction));
     updatedConv.messages[msgIdx] = msg;
@@ -629,35 +356,35 @@ export default function Chat() {
   return (
     <>
       <Header activeTab="create" showNewChat />
-      <div className="chat-messages" ref={messagesRef}>
+      <div className={styles.messages} ref={messagesRef}>
         {conversation?.messages.map((msg, i) => {
           if (msg.role === 'user') {
             const referenceImages = getReferenceImages(msg);
             return (
-              <div key={i} className="message message-user">
-                <div className="prompt-card">
-                  <div className="prompt-card-header">
+              <div key={i} className={`${styles.message} ${styles.messageUser}`}>
+                <div className={styles.promptCard}>
+                  <div className={styles.cardHeader}>
                     <span>Prompt</span>
                     {referenceImages.length > 0 && (
                       <span>{referenceImages.length === 1 ? 'Reference attached' : `${referenceImages.length} references attached`}</span>
                     )}
                   </div>
                   {referenceImages.length > 0 ? (
-                    <div className="prompt-card-body has-reference">
-                      <div className="prompt-reference-thumbs">
+                    <div className={`${styles.promptCardBody} ${styles.promptCardBodyHasRef}`}>
+                      <div className={styles.refThumbs}>
                         {referenceImages.map((src, idx) => (
                           <img
                             key={`${idx}-${src.slice(0, 24)}`}
                             src={src}
-                            className="prompt-reference-thumb"
+                            className={styles.refThumb}
                             alt=""
                           />
                         ))}
                       </div>
-                      <div className="prompt-text">{msg.text}</div>
+                      <div className={styles.promptText}>{msg.text}</div>
                     </div>
                   ) : (
-                    <div className="prompt-text">{msg.text}</div>
+                    <div className={styles.promptText}>{msg.text}</div>
                   )}
                 </div>
               </div>
@@ -699,7 +426,7 @@ export default function Chat() {
         )}
       </div>
 
-      <div style={{ padding: '0 24px 16px', maxWidth: 900, width: '100%', margin: '0 auto' }}>
+      <div className={styles.inputWrapper}>
         <InputBar
           ref={inputRef}
           placeholder="Continue creating..."

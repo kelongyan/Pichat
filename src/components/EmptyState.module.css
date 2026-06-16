@@ -1,0 +1,29 @@
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-5);
+  padding: 80px var(--space-5) var(--space-6);
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.emptyIcon {
+  color: var(--text-muted);
+  font-size: 48px;
+  margin-bottom: var(--space-4);
+}
+
+.emptyTitle {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-base);
+}
+
+.emptySubtitle {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-1);
+}

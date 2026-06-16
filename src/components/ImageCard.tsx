@@ -4,6 +4,7 @@ import { buildImageFilename } from '../lib/filename';
 import { getImageURL, getThumbURL, getImageBlob, getImageBase64, toImageDataUrl } from '../lib/imageStore';
 import { getImageActionLabel, type ImageAction } from '../lib/imageActions';
 import { downloadBlob } from '../lib/download';
+import styles from './ImageCard.module.css';
 
 type CardImageAction = Exclude<ImageAction, 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
 
@@ -104,22 +105,22 @@ export function ImageCard({
   if (!src) return null;
 
   return (
-    <div className="image-card" onClick={handleCardClick}>
+    <div className={styles.imageCard} onClick={handleCardClick}>
       <img src={src} alt="Generated image" loading="lazy" />
-      <div className="image-card-overlay">
-        <span className="image-card-badge">{size}</span>
+      <div className={styles.overlay}>
+        <span className={styles.badge}>{size}</span>
         <button
-          className="image-card-btn download"
+          className={`${styles.cardBtn} ${styles.download}`}
           title="Download"
           onClick={handleDownload}
         >
           <Download size={14} />
         </button>
         {(onCopyPrompt || onAction) && (
-          <div className="image-card-action-stack">
+          <div className={styles.actionStack}>
             {onCopyPrompt && (
               <button
-                className="image-card-btn copy"
+                className={styles.cardBtn}
                 title="Copy prompt"
                 onClick={handleCopyPrompt}
               >
@@ -129,7 +130,7 @@ export function ImageCard({
             {onAction && CARD_ACTIONS.map((action) => (
               <button
                 key={action}
-                className={`image-card-btn action action-${action}`}
+                className={styles.cardBtn}
                 title={`${getImageActionLabel(action)} from this image`}
                 onClick={(e) => handleAction(e, action)}
               >
@@ -140,14 +141,14 @@ export function ImageCard({
           </div>
         )}
         <button
-          className="image-card-btn edit"
+          className={`${styles.cardBtn} ${styles.edit}`}
           title="Edit with this image as reference"
           onClick={handleEdit}
         >
           <Pencil size={12} /> Edit
         </button>
         <button
-          className="image-card-btn fullscreen"
+          className={`${styles.cardBtn} ${styles.fullscreen}`}
           title="Fullscreen"
           onClick={handleFullscreen}
         >

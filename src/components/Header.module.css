@@ -1,0 +1,203 @@
+.header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  padding: 0 var(--space-5);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+}
+
+.gradientLine {
+  display: none;
+}
+
+.logo {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.logoIcon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.logoText {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--ring);
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.iconBtn {
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.iconBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.iconBtn[data-action="menu"] {
+  display: none;
+}
+
+.settingsBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 450;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  margin-left: var(--space-1);
+}
+
+.settingsBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--ring);
+  color: var(--text-primary);
+}
+
+.tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+.tab {
+  padding: 5px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.tabActive {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+/* Mobile Menu */
+.mobileMenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  flex-direction: column;
+  gap: 4px;
+  z-index: 99;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+}
+
+.mobileMenuOpen {
+  display: flex;
+}
+
+.mobileMenuItem {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mobileMenuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mobileMenuItemActive {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/* Dark theme */
+:global([data-theme="dark"]) .logoIcon {
+  filter: invert(1) brightness(0.9);
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 0 var(--space-4);
+  }
+  .logoText {
+    display: none;
+  }
+  .tabs {
+    display: none;
+  }
+  .iconBtn[data-action="menu"] {
+    display: flex;
+  }
+  .btnLabel {
+    display: none;
+  }
+}

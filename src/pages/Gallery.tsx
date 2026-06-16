@@ -25,6 +25,7 @@ import {
   type GalleryMetaMap,
 } from '../lib/galleryMeta';
 import type { GalleryImage } from '../types';
+import styles from './Gallery.module.css';
 
 const DEFAULT_FILTERS: GalleryFilterState = {
   query: '',
@@ -42,7 +43,7 @@ function GalleryCompareThumb({ image }: { image: GalleryImage }) {
 
   if (!src) return null;
   return (
-    <div className="gallery-compare-thumb">
+    <div className={styles.compareThumb}>
       <img src={src} alt="" />
       <span>{image.prompt}</span>
     </div>
@@ -157,9 +158,9 @@ export default function Gallery() {
         />
       )}
       {images.length > 0 && (
-        <div className="gallery-shell fade-in">
-          <div className="gallery-toolbar">
-            <label className="gallery-search" aria-label="Search gallery">
+        <div className={`${styles.shell} fade-in`}>
+          <div className={styles.toolbar}>
+            <label className={styles.search} aria-label="Search gallery">
               <Search size={15} />
               <input
                 value={filters.query}
@@ -168,7 +169,7 @@ export default function Gallery() {
               />
             </label>
             <button
-              className={`gallery-filter-btn${filters.favoriteOnly ? ' active' : ''}`}
+              className={`${styles.filterBtn}${filters.favoriteOnly ? ` ${styles.filterBtnActive}` : ''}`}
               type="button"
               aria-pressed={filters.favoriteOnly}
               onClick={() => updateFilters({ favoriteOnly: !filters.favoriteOnly })}
@@ -194,7 +195,7 @@ export default function Gallery() {
             </select>
             {hasFilters && (
               <button
-                className="gallery-clear-btn"
+                className={styles.clearBtn}
                 type="button"
                 title="Clear filters"
                 aria-label="Clear filters"
@@ -206,19 +207,21 @@ export default function Gallery() {
           </div>
 
           {filteredImages.length === 0 ? (
-            <div className="gallery-empty-state">No images match these filters</div>
+            <div className={styles.emptyState}>No images match these filters</div>
           ) : (
-            <div className="gallery-grid">
+            <div className={styles.grid}>
               {filteredImages.map((img) => {
                 const key = buildGalleryImageKey(img);
                 const entry = meta[key] || {};
                 const comparing = compareKeys.includes(key);
                 const tagsText = tagDrafts[key] ?? (entry.tags || []).join(', ');
+
+                let itemClass = styles.item;
+                if (entry.favorite) itemClass += ` ${styles.itemFavorite}`;
+                if (comparing) itemClass += ` ${styles.itemComparing}`;
+
                 return (
-                  <div
-                    key={key}
-                    className={`gallery-item${entry.favorite ? ' favorite' : ''}${comparing ? ' comparing' : ''}`}
-                  >
+                  <div key={key} className={itemClass}>
                     <ImageCard
                       imageId={img.imageId}
                       imageBase64={img.imageBase64}
@@ -231,9 +234,9 @@ export default function Gallery() {
                       onCopyPrompt={() => handleCopyPrompt(img.prompt)}
                       onAction={(action, src) => handleAction(action, src, img)}
                     />
-                    <div className="gallery-item-meta">
+                    <div className={styles.itemMeta}>
                       <button
-                        className={`gallery-meta-btn${entry.favorite ? ' active' : ''}`}
+                        className={`${styles.metaBtn}${entry.favorite ? ` ${styles.metaBtnActive}` : ''}`}
                         type="button"
                         title={entry.favorite ? 'Remove favorite' : 'Add favorite'}
                         aria-pressed={!!entry.favorite}
@@ -242,7 +245,7 @@ export default function Gallery() {
                         <Star size={14} fill={entry.favorite ? 'currentColor' : 'none'} />
                       </button>
                       <button
-                        className={`gallery-meta-btn${comparing ? ' active' : ''}`}
+                        className={`${styles.metaBtn}${comparing ? ` ${styles.metaBtnActive}` : ''}`}
                         type="button"
                         title="Add to compare"
                         aria-pressed={comparing}
@@ -250,7 +253,7 @@ export default function Gallery() {
                       >
                         <Columns2 size={14} />
                       </button>
-                      <label className="gallery-tag-input">
+                      <label className={styles.tagInput}>
                         <Tags size={13} />
                         <input
                           value={tagsText}
@@ -275,14 +278,14 @@ export default function Gallery() {
         </div>
       )}
       {compareImages.length >= 2 && (
-        <div className="gallery-compare-panel">
-          <div className="gallery-compare-header">
+        <div className={styles.comparePanel}>
+          <div className={styles.compareHeader}>
             <span>Compare</span>
             <button type="button" title="Clear compare" onClick={() => setCompareKeys([])}>
               <X size={14} />
             </button>
           </div>
-          <div className="gallery-compare-grid">
+          <div className={styles.compareGrid}>
             {compareImages.map((img) => (
               <GalleryCompareThumb key={buildGalleryImageKey(img)} image={img} />
             ))}

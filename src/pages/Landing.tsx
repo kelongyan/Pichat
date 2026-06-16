@@ -3,6 +3,7 @@ import { Header } from '../components/Header';
 import { InputBar } from '../components/InputBar';
 import type { SendData } from '../components/InputBar';
 import { useConfigStore } from '../lib/store';
+import styles from './Landing.module.css';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -26,11 +27,11 @@ export default function Landing() {
   return (
     <>
       <Header activeTab="create" />
-      <div className="landing fade-in">
-        <img src="assets/logo.png" alt="Pichat" className="landing-logo" />
-        <h1 className="landing-title">What would you like to create?</h1>
-        <p className="landing-subtitle">Describe any image and bring it to life</p>
-        <div className="landing-input">
+      <div className={`${styles.landing} fade-in`}>
+        <img src="assets/logo.png" alt="Pichat" className={styles.logo} />
+        <h1 className={styles.heroTitle}>What would you like to create?</h1>
+        <p className={styles.subtitle}>Describe any image and bring it to life</p>
+        <div className={styles.inputWrapper}>
           <InputBar
             placeholder="Describe the image you want..."
             onSend={handleSend}

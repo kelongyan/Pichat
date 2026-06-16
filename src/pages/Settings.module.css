@@ -1,0 +1,489 @@
+/* ---- Initial Connect View ---- */
+.view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 60px 20px 40px;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  margin-bottom: var(--space-5);
+}
+
+.github {
+  position: fixed;
+  top: 18px;
+  right: var(--space-5);
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+  z-index: 10;
+}
+
+.github:hover {
+  color: var(--text-primary);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  margin-bottom: 28px;
+}
+
+/* ---- Full Settings Page ---- */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  padding: 14px var(--space-5);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: 50;
+}
+
+.pageTitle {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 auto;
+}
+
+.spacer {
+  width: 36px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.backBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--ring);
+}
+
+.pageBody {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px var(--space-5) 64px;
+}
+
+/* ---- Settings Card ---- */
+.card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 20px 22px;
+  margin-bottom: var(--space-4);
+}
+
+.cardTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+/* ---- Buttons ---- */
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  margin-top: var(--space-2);
+}
+
+.addBtn:hover {
+  border-color: var(--ring);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.actionRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.actionBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--ring);
+  color: var(--text-primary);
+}
+
+.saveMain {
+  width: 100%;
+  margin-top: var(--space-1);
+  margin-bottom: 20px;
+  padding: var(--space-3);
+  font-size: var(--font-size-base);
+}
+
+.pageFooter {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-2);
+}
+
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.footerLink:hover {
+  color: var(--text-primary);
+}
+
+/* ---- Toggle Row ---- */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+}
+
+.toggleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggleName {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.toggleDesc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ---- Provider Card ---- */
+.providerList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.providerCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  padding: var(--space-3) 14px;
+}
+
+.providerCardDefault {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-light);
+}
+
+.providerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 10px;
+}
+
+.providerInfo {
+  min-width: 0;
+}
+
+.providerName {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.providerMeta {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  margin-top: 2px;
+}
+
+.providerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.providerBtn {
+  padding: var(--space-1) 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.providerBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--ring);
+  color: var(--text-primary);
+}
+
+.providerBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--ring);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fields :global(.form-group) {
+  margin-bottom: 0;
+}
+
+.fieldsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ---- Protocol Pills ---- */
+.pills {
+  display: flex;
+  gap: 0;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  height: 38px;
+}
+
+.pill {
+  flex: 1;
+  padding: 0 var(--space-3);
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 450;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.pill + .pill {
+  border-left: 1px solid var(--border);
+}
+
+.pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.pillActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 500;
+}
+
+/* ---- Template Card ---- */
+.templateList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.templateCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  padding: var(--space-3) 14px;
+}
+
+.templateHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+}
+
+.templateCard :global(.form-input) {
+  margin: 0;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 86px;
+  line-height: 1.5;
+}
+
+/* ---- Provider Stats ---- */
+.statsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.statCard:last-child {
+  border-bottom: none;
+}
+
+.statInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.statModel {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.statMetrics {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.statsEmpty {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) 0;
+}
+
+/* ---- Dark theme ---- */
+:global([data-theme="dark"]) .logo {
+  filter: invert(1) brightness(0.9);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+  .pageBody {
+    padding: 20px var(--space-4) 48px;
+  }
+  .providerTop {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .providerActions {
+    justify-content: flex-start;
+  }
+  .fieldsRow {
+    grid-template-columns: 1fr;
+  }
+  .fields {
+    grid-template-columns: 1fr;
+  }
+  .card {
+    padding: 14px var(--space-4);
+  }
+  .templateHeader {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}

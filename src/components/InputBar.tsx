@@ -14,6 +14,7 @@ import {
   type ImageAspect,
   type ImageResolution,
 } from '../lib/imagePresets';
+import styles from './InputBar.module.css';
 
 export interface SendData {
   prompt: string;
@@ -170,14 +171,14 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     <div>
       <button
         type="button"
-        className={`input-bar-extra-toggle${settingsOpen ? ' open' : ''}`}
+        className={`${styles.extraToggle}${settingsOpen ? ` ${styles.extraToggleOpen}` : ''}`}
         onClick={() => setSettingsOpen((v) => !v)}
       >
         <ChevronDown size={14} />
         <span>Ratio & Quality</span>
       </button>
 
-      <div className={`input-bar-extra${settingsOpen ? ' open' : ''}`}>
+      <div className={`${styles.extra}${settingsOpen ? ` ${styles.extraOpen}` : ''}`}>
         <div className="generation-settings" aria-label="Image generation settings">
           <div className="generation-setting-group">
             <span className="generation-setting-label">Ratio</span>
@@ -217,7 +218,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
         </div>
 
         {selectedAspect === 'custom' && (
-          <div className="size-custom-row" style={{ display: 'flex' }}>
+          <div className="size-custom-row">
             <input
               type="number"
               className="size-custom-input"
@@ -249,13 +250,13 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
       </div>
 
       {attachedImages.length > 0 && (
-        <div className="reference-preview" aria-live="polite">
-          <div className="reference-preview-thumbs">
+        <div className={styles.referencePreview} aria-live="polite">
+          <div className={styles.referenceThumbs}>
             {attachedImages.map((src, i) => (
               <button
                 key={i}
                 type="button"
-                className="reference-preview-thumb"
+                className={styles.referenceThumb}
                 title="Remove reference image"
                 aria-label={`Remove reference image ${i + 1}`}
                 onClick={() => removeImage(i)}
@@ -264,20 +265,20 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
               </button>
             ))}
           </div>
-          <div className="reference-preview-copy">
-            <span className="reference-preview-title">
+          <div className={styles.referenceCopy}>
+            <span className={styles.referenceTitle}>
               {attachedImages.length === 1
                 ? 'Using this image as the starting point'
                 : `Using ${attachedImages.length} images as the starting point`}
             </span>
-            <span className="reference-preview-hint">Write what should change or stay.</span>
+            <span className={styles.referenceHint}>Write what should change or stay.</span>
           </div>
         </div>
       )}
 
-      <div className="input-bar">
+      <div className={styles.inputBar}>
         <button
-          className="input-bar-attach"
+          className={styles.attachBtn}
           title="Attach reference image"
           onClick={() => fileRef.current?.click()}
         >
@@ -293,7 +294,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
         />
         <textarea
           ref={textRef}
-          className="input-bar-text"
+          className={styles.textarea}
           placeholder={inputPlaceholder}
           rows={1}
           value={text}
@@ -308,7 +309,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
         />
         {isGenerating && onStop ? (
           <button
-            className="input-bar-stop"
+            className={styles.stopBtn}
             title="Stop generation"
             aria-label="Stop generation"
             onClick={onStop}
@@ -317,7 +318,7 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
           </button>
         ) : (
           <button
-            className="input-bar-send"
+            className={styles.sendBtn}
             disabled={!text.trim()}
             onClick={doSend}
           >

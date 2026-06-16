@@ -1,4 +1,4 @@
-import { generateId } from './store';
+import { generateId } from './utils';
 
 const IMAGES_STORE = 'images';
 let db: IDBDatabase | null = null;

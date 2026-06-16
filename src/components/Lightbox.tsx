@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { X } from 'lucide-react';
+import styles from './Lightbox.module.css';
 
 interface LightboxState {
   src: string;
@@ -66,12 +67,12 @@ export function Lightbox({ src, prompt, onClose }: LightboxProps) {
   }
 
   return (
-    <div className="lightbox fade-in" onClick={handleBackdropClick}>
-      <button className="lightbox-close" onClick={onClose}>
+    <div className={`${styles.lightbox} fade-in`} onClick={handleBackdropClick}>
+      <button className={styles.close} onClick={onClose}>
         <X size={20} />
       </button>
       <img src={src} alt={prompt || 'Generated image'} />
-      {prompt && <p className="lightbox-prompt">{prompt}</p>}
+      {prompt && <p className={styles.prompt}>{prompt}</p>}
     </div>
   );
 }
