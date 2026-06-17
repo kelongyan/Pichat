@@ -1,35 +1,37 @@
 .list {
   display: flex;
   flex-direction: column;
-  padding: var(--space-5);
-  max-width: 800px;
+  padding: 28px var(--space-5);
+  max-width: 840px;
   margin: 0 auto;
   width: 100%;
-  gap: var(--space-2);
+  gap: 10px;
 }
 
 .item {
   display: flex;
   gap: var(--space-4);
   align-items: center;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
+  padding: 13px var(--space-4);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-primary));
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: background var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+  box-shadow: 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .item:hover {
-  background: var(--bg-hover);
-  transform: translateX(3px);
-  border-color: var(--border-strong);
+  background: var(--bg-secondary);
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-strong));
+  box-shadow: var(--shadow-whisper);
 }
 
 .thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-sm);
+  width: 58px;
+  height: 58px;
+  border-radius: var(--radius-md);
   background: var(--bg-primary);
   overflow: hidden;
   flex-shrink: 0;
@@ -49,7 +51,7 @@
 
 .prompt {
   font-size: var(--font-size-base);
-  font-weight: 500;
+  font-weight: 550;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -69,7 +71,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-tertiary);
   cursor: pointer;
   opacity: 0;
@@ -85,4 +87,21 @@
 .deleteBtn:hover {
   background: var(--accent-light);
   color: var(--error);
+}
+
+@media (max-width: 640px) {
+  .list {
+    padding: var(--space-4);
+  }
+  .item {
+    gap: var(--space-3);
+    padding: 12px;
+  }
+  .thumb {
+    width: 50px;
+    height: 50px;
+  }
+  .deleteBtn {
+    opacity: 1;
+  }
 }

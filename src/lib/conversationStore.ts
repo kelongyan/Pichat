@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Conversation, GalleryImage } from '../types';
 import { deleteImage } from './imageStore';
-import { db, CONV_STORE, GALLERY_STORE, readRequest, waitForTx } from './db';
+import { getDB, CONV_STORE, GALLERY_STORE, readRequest, waitForTx } from './db';
 import {
   syncGalleryForConversation,
   deleteGalleryForConversation,
@@ -10,9 +10,15 @@ import {
   type GalleryIndexRecord,
 } from './galleryIndex';
 
+/** In-memory cache of all gallery images to avoid repeated full-table IndexedDB reads. */
+let galleryCache: GalleryImage[] | null = null;
+/** Bumped whenever gallery data changes; components subscribe to trigger refresh. */
+let galleryVersion = 0;
+
 interface ConversationState {
   conversations: Conversation[];
   loading: boolean;
+  galleryVersion: number;
   loadAll: () => Promise<void>;
   get: (id: string) => Promise<Conversation | null>;
   save: (conversation: Conversation) => Promise<void>;
@@ -22,13 +28,26 @@ interface ConversationState {
   getImagePage: (cursor: string | null, pageSize: number) => Promise<{ images: GalleryImage[]; nextCursor: string | null }>;
 }
 
+function bumpGalleryVersion() {
+  galleryVersion++;
+  // Use zustand set to notify subscribers.
+  useConversationStore.setState({ galleryVersion });
+}
+
+/** Invalidate the in-memory gallery cache (e.g. after save/remove). */
+function invalidateGalleryCache() {
+  galleryCache = null;
+}
+
 export const useConversationStore = create<ConversationState>((set, get) => ({
   conversations: [],
   loading: false,
+  galleryVersion: 0,
   loadAll: async () => {
-    if (!db) return;
+    const database = getDB();
+    if (!database) return;
     set({ loading: true });
-    const tx = db.transaction(CONV_STORE, 'readonly');
+    const tx = database.transaction(CONV_STORE, 'readonly');
     const store = tx.objectStore(CONV_STORE);
     const request = store.getAll();
     const result = await new Promise<Conversation[]>((resolve, reject) => {
@@ -38,8 +57,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     set({ conversations: result, loading: false });
   },
   get: async (id: string) => {
-    if (!db) return null;
-    const tx = db.transaction(CONV_STORE, 'readonly');
+    const database = getDB();
+    if (!database) return null;
+    const tx = database.transaction(CONV_STORE, 'readonly');
     const store = tx.objectStore(CONV_STORE);
     const request = store.get(id);
     return new Promise<Conversation | null>((resolve, reject) => {
@@ -48,12 +68,15 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     });
   },
   save: async (conversation: Conversation) => {
-    if (!db) return;
-    const tx = db.transaction(CONV_STORE, 'readwrite');
+    const database = getDB();
+    if (!database) return;
+    const tx = database.transaction(CONV_STORE, 'readwrite');
     const store = tx.objectStore(CONV_STORE);
     store.put(conversation);
     await waitForTx(tx);
     await syncGalleryForConversation(conversation);
+    invalidateGalleryCache();
+    bumpGalleryVersion();
     set((state) => {
       const idx = state.conversations.findIndex((c) => c.id === conversation.id);
       if (idx >= 0) {
@@ -65,34 +88,42 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     });
   },
   remove: async (id: string) => {
-    if (!db) return;
+    const database = getDB();
+    if (!database) return;
     const existing = await get().get(id);
     const imageIds = existing ? extractImageIds(existing) : [];
 
-    const tx = db.transaction(CONV_STORE, 'readwrite');
+    const tx = database.transaction(CONV_STORE, 'readwrite');
     const store = tx.objectStore(CONV_STORE);
     store.delete(id);
     await waitForTx(tx);
     await deleteGalleryForConversation(id);
     await Promise.all(imageIds.map((imageId) => deleteImage(imageId)));
+    invalidateGalleryCache();
+    bumpGalleryVersion();
     set((state) => ({
       conversations: state.conversations.filter((c) => c.id !== id),
     }));
   },
   getAllImages: async () => {
-    if (!db) return [];
-    const tx = db.transaction(GALLERY_STORE, 'readonly');
+    if (galleryCache) return galleryCache;
+    const database = getDB();
+    if (!database) return [];
+    const tx = database.transaction(GALLERY_STORE, 'readonly');
     const records = await readRequest<GalleryIndexRecord[]>(tx.objectStore(GALLERY_STORE).getAll());
     await waitForTx(tx);
-    return records
+    const result = records
       .sort((a, b) => b.timestamp - a.timestamp)
       .map(toGalleryImage);
+    galleryCache = result;
+    return result;
   },
   getRecentImages: async (limit: number) => {
-    if (!db || limit <= 0) return [];
+    const database = getDB();
+    if (!database || limit <= 0) return [];
     return new Promise((resolve, reject) => {
       const images: GalleryImage[] = [];
-      const tx = db!.transaction(GALLERY_STORE, 'readonly');
+      const tx = database.transaction(GALLERY_STORE, 'readonly');
       const index = tx.objectStore(GALLERY_STORE).index('timestamp');
       const request = index.openCursor(null, 'prev');
       request.onsuccess = () => {
@@ -108,12 +139,13 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     });
   },
   getImagePage: async (cursor: string | null, pageSize: number) => {
-    if (!db || pageSize <= 0) return { images: [], nextCursor: null };
+    const database = getDB();
+    if (!database || pageSize <= 0) return { images: [], nextCursor: null };
     let foundCursor = !cursor;
 
     return new Promise<{ images: GalleryImage[]; nextCursor: string | null }>((resolve, reject) => {
       const collected: GalleryIndexRecord[] = [];
-      const tx = db!.transaction(GALLERY_STORE, 'readonly');
+      const tx = database.transaction(GALLERY_STORE, 'readonly');
       const index = tx.objectStore(GALLERY_STORE).index('timestamp');
       const request = index.openCursor(null, 'prev');
       request.onsuccess = () => {

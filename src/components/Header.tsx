@@ -60,7 +60,7 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
       </div>
       <div className={styles.actions}>
         {showNewChat && (
-          <button className={styles.btn} onClick={() => handleTab('create')}>
+          <button className={styles.btn} onClick={() => navigate('/chat', { state: { forceNew: true } })}>
             <PlusCircle size={16} />
             <span className={styles.btnLabel}>New</span>
           </button>

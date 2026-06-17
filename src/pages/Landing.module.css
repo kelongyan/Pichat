@@ -4,38 +4,45 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--space-5);
-  padding: 80px var(--space-5) var(--space-6);
-  max-width: 720px;
+  gap: var(--space-4);
+  padding: 86px var(--space-5) var(--space-6);
+  max-width: 760px;
   margin: 0 auto;
   width: 100%;
 }
 
 .logo {
-  height: 48px;
+  height: 52px;
   object-fit: contain;
+  margin-bottom: var(--space-2);
 }
 
 .heroTitle {
   font-family: var(--font-serif);
-  font-size: var(--font-size-2xl);
+  font-size: clamp(34px, 5vw, 48px);
   font-weight: 500;
   color: var(--text-primary);
   text-align: center;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  letter-spacing: 0;
+  line-height: 1.14;
+  max-width: 680px;
 }
 
 .subtitle {
   font-size: 17px;
   color: var(--text-secondary);
-  margin-top: -12px;
   text-align: center;
+  line-height: 1.6;
 }
 
 .inputWrapper {
   width: 100%;
-  margin-top: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--bg-secondary) 64%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Dark theme */
@@ -43,11 +50,65 @@
   filter: invert(1) brightness(0.9);
 }
 
+.recentSection {
+  width: 100%;
+  margin-top: var(--space-6);
+}
+
+.recentTitle {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  text-align: left;
+}
+
+.recentGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.recentThumb {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  padding: 0;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.recentThumb:hover {
+  transform: scale(1.03);
+  box-shadow: var(--shadow-md);
+}
+
+.recentThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 @media (max-width: 640px) {
+  .landing {
+    padding: 54px var(--space-4) var(--space-5);
+  }
   .heroTitle {
     font-size: 32px;
   }
   .subtitle {
     font-size: var(--font-size-base);
+  }
+  .inputWrapper {
+    margin-top: var(--space-3);
+    padding: var(--space-2);
+    border-radius: var(--radius-lg);
+  }
+  .recentGrid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }

@@ -1,15 +1,18 @@
 .shell {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 18px var(--space-5) 0;
+  gap: 8px;
+  padding: 20px var(--space-5) 0;
   flex-wrap: wrap;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .search {
@@ -21,7 +24,7 @@
   min-height: 38px;
   padding: 0 var(--space-3);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: var(--bg-secondary);
   color: var(--text-tertiary);
 }
@@ -41,9 +44,9 @@
 
 .toolbar select {
   min-height: 38px;
-  padding: 0 var(--space-3);
+  padding: 0 32px 0 var(--space-3);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: var(--bg-secondary);
 }
 
@@ -55,7 +58,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   border: 1px solid var(--border-strong);
   background: var(--bg-secondary);
   color: var(--text-secondary);
@@ -95,8 +98,11 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+  gap: 22px;
   padding: var(--space-5);
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .grid :global(.image-card) img {
@@ -107,7 +113,7 @@
 .item {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .itemFavorite :global(.image-card) {
@@ -123,6 +129,7 @@
   gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
+  padding: 0 2px;
 }
 
 .tagInput {
@@ -133,7 +140,7 @@
   gap: 6px;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: var(--bg-secondary);
   color: var(--text-tertiary);
 }
@@ -149,12 +156,14 @@
 
 /* ---- Compare Panel ---- */
 .comparePanel {
-  margin: 0 var(--space-5) var(--space-5);
+  margin: 0 auto var(--space-5);
   padding: var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
   box-shadow: var(--shadow-whisper);
+  max-width: calc(1240px - (var(--space-5) * 2));
+  width: calc(100% - (var(--space-5) * 2));
 }
 
 .compareHeader {
@@ -166,7 +175,7 @@
   font-size: var(--font-size-sm);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.04em;
   color: var(--text-tertiary);
 }
 
@@ -225,6 +234,7 @@
     padding: var(--space-4);
   }
   .comparePanel {
-    margin: 0 var(--space-4) var(--space-4);
+    width: calc(100% - (var(--space-4) * 2));
+    margin: 0 auto var(--space-4);
   }
 }

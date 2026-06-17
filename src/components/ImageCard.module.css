@@ -1,28 +1,30 @@
 .imageCard {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   cursor: pointer;
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-whisper);
-  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  background: var(--bg-secondary);
+  transition: border-color var(--transition-normal), transform var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .imageCard:hover {
   transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-strong));
   box-shadow: var(--shadow-md);
 }
 
 .imageCard img {
   display: block;
   width: 100%;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(20, 20, 19, 0.35);
+  background: linear-gradient(180deg, rgba(20, 20, 19, 0.32), rgba(20, 20, 19, 0.12) 42%, rgba(20, 20, 19, 0.38));
   opacity: 0;
   transition: opacity var(--transition-normal);
   display: flex;
@@ -36,10 +38,10 @@
   position: absolute;
   top: var(--space-3);
   left: var(--space-3);
-  padding: var(--space-1) 10px;
-  background: rgba(20, 20, 19, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: rgba(20, 20, 19, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.9);
   font-family: var(--font-sans);
@@ -50,13 +52,13 @@
   position: absolute;
   width: 36px;
   height: 36px;
-  background: rgba(25, 25, 24, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
+  background: rgba(250, 249, 245, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #141413;
   cursor: pointer;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -64,7 +66,7 @@
 }
 
 .cardBtn:hover {
-  background: var(--bg-primary);
+  background: #ffffff;
   transform: scale(1.05);
 }
 
@@ -106,7 +108,7 @@
   gap: 6px;
   font-size: var(--font-size-sm);
   font-weight: 500;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
 }
 
 .fullscreen {

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart3, Download, FileText, Plus, Trash2, Upload, ArrowLeft } from 'lucide-react';
 import { useToast } from '../components/Toast';
@@ -8,6 +9,7 @@ import { downloadJsonFile, exportPichatData, importPichatData, type PichatExport
 import { loadCustomPromptTemplates, saveCustomPromptTemplates, type PromptTemplate } from '../lib/promptTemplates';
 import { loadProviderStats, summarizeProviderStats, type ProviderStatsSummary } from '../lib/providerStats';
 import { sanitizeProvider, validateProvider, testProviderConnection } from '../lib/settingsUtils';
+import { getSystemPromptVersion, preloadSystemPrompt } from '../lib/api';
 import type { Config, ProviderConfig } from '../types';
 import { ConnectView } from './ConnectView';
 import styles from './Settings.module.css';
@@ -56,6 +58,16 @@ function FullSettings({ config }: { config: Config }) {
   const [testingId, setTestingId] = useState('');
   const [templates, setTemplates] = useState<PromptTemplate[]>(() => loadCustomPromptTemplates());
   const [providerStats, setProviderStats] = useState<ProviderStatsSummary[]>(() => summarizeProviderStats(loadProviderStats()));
+  const [promptVersion, setPromptVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await preloadSystemPrompt();
+      if (!cancelled) setPromptVersion(getSystemPromptVersion());
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function updateProvider(id: string, patch: Partial<ProviderConfig>) {
     setProviders((items) => items.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -156,6 +168,17 @@ function FullSettings({ config }: { config: Config }) {
     setProviders(sanitized);
     setDefaultProviderId(defaultId);
     showToast('Settings saved', { type: 'success' });
+    // Background health check for the default provider so users catch a broken key/baseURL early.
+    void runHealthCheck(sanitized.find((p) => p.id === defaultId)!);
+  }
+
+  async function runHealthCheck(provider: ProviderConfig) {
+    try {
+      await testProviderConnection(provider);
+      showToast(`${provider.name} looks healthy`, { type: 'success' });
+    } catch {
+      showToast(`${provider.name} did not respond — check API key and base URL`, { type: 'error' });
+    }
   }
 
   return (
@@ -196,7 +219,10 @@ function FullSettings({ config }: { config: Config }) {
           <div className={styles.toggleRow}>
             <div className={styles.toggleInfo}>
               <span className={styles.toggleName}>System prompt</span>
-              <span className={styles.toggleDesc}>Inject personality and style instructions</span>
+              <span className={styles.toggleDesc}>
+                Inject personality and style instructions
+                {promptVersion ? <span className={styles.metaTag}>v{promptVersion}</span> : null}
+              </span>
             </div>
             <label className="toggle-switch">
               <input type="checkbox" checked={useSystemPrompt} onChange={(e) => setUseSystemPrompt(e.target.checked)} />

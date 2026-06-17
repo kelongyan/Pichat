@@ -11,16 +11,23 @@ import styles from './Toast.module.css';
 
 export type ToastType = 'info' | 'success' | 'error';
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastItem {
   id: number;
   message: string;
   type: ToastType;
   show: boolean;
+  action?: ToastAction;
 }
 
 interface ToastOptions {
   type?: ToastType;
   duration?: number;
+  action?: ToastAction;
 }
 
 export interface ToastContextValue {
@@ -51,10 +58,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+    timersRef.current.delete(id);
+  }, []);
+
   const show = useCallback((message: string, options: ToastOptions = {}) => {
-    const { type = 'info', duration = 4000 } = options;
+    const { type = 'info', action } = options;
+    const duration = options.duration ?? (action ? 8000 : 4000);
     const id = ++idRef.current;
-    setToasts((prev) => [...prev, { id, message, type, show: false }]);
+    setToasts((prev) => [...prev, { id, message, type, show: false, action }]);
 
     const raf = requestAnimationFrame(() => {
       setToasts((prev) =>
@@ -79,12 +92,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} dismiss={dismiss} />
     </ToastContext.Provider>
   );
 }
 
-function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
+function ToastContainer({ toasts, dismiss }: { toasts: ToastItem[]; dismiss: (id: number) => void }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
@@ -103,7 +116,18 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
           className={`${styles.toast} ${t.type === 'success' ? styles.success : t.type === 'error' ? styles.error : ''}${t.show ? ` ${styles.show}` : ''}`}
         >
           <span className={styles.icon} aria-hidden="true">{icons[t.type]}</span>
-          <span>{t.message}</span>
+          <span className={styles.message}>{t.message}</span>
+          {t.action && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => {
+                t.action!.onClick();
+                dismiss(t.id);
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>

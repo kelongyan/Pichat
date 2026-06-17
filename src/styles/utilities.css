@@ -7,7 +7,7 @@
   font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.04em;
   color: var(--text-tertiary);
   margin-bottom: var(--space-2);
   display: block;
@@ -18,17 +18,20 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  min-height: 42px;
+  padding: 9px var(--space-4);
   font-size: var(--font-size-base);
   color: var(--text-primary);
   outline: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 48%, transparent);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   font-family: var(--font-sans);
 }
 
 .form-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring);
+  background: color-mix(in srgb, var(--bg-secondary) 86%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border-strong));
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* ---- Primary Button ---- */
@@ -36,13 +39,15 @@
   width: 100%;
   background: var(--accent);
   color: var(--text-on-accent);
-  padding: 14px;
+  min-height: 44px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-md);
   font-weight: 600;
   font-size: var(--font-size-md);
   cursor: pointer;
   border: none;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 68%, #141413), 0 8px 18px color-mix(in srgb, var(--accent) 15%, transparent);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .btn-primary:hover {
@@ -58,6 +63,7 @@
   background: var(--bg-tertiary);
   color: var(--text-muted);
   cursor: not-allowed;
+  box-shadow: 0 0 0 1px var(--border-strong);
   transform: none;
 }
 
@@ -82,7 +88,7 @@
   inset: 0;
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: inset 0 1px 2px rgba(20, 20, 19, 0.08), 0 0 0 1px var(--border-strong);
   transition: background var(--transition-fast);
 }
 
@@ -118,7 +124,10 @@
   gap: var(--space-3);
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-primary));
 }
 
 .generation-settings::-webkit-scrollbar {
@@ -131,11 +140,12 @@
 
 .generation-setting-label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
   font-weight: 600;
   line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 .generation-pill-row {
@@ -145,10 +155,10 @@
 }
 
 .generation-pill {
-  min-height: 30px;
-  padding: 6px 9px;
+  min-height: 32px;
+  padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: var(--bg-secondary);
   color: var(--text-secondary);
   cursor: pointer;
@@ -156,7 +166,8 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: 1;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  box-shadow: 0 1px 0 color-mix(in srgb, #ffffff 42%, transparent);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .generation-pill:hover {
@@ -169,6 +180,7 @@
   background: var(--text-primary);
   border-color: var(--text-primary);
   color: var(--bg-primary);
+  box-shadow: none;
 }
 
 .generation-pill:focus-visible {
@@ -180,10 +192,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3) 10px;
+  padding: var(--space-2) var(--space-3) 0;
   justify-content: flex-end;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-1);
 }
 
 .size-custom-input {

@@ -2,18 +2,22 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: none;
-  background: none;
+  min-height: 30px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-tertiary);
   font-size: var(--font-size-sm);
+  font-weight: 600;
   cursor: pointer;
-  transition: color var(--transition-fast);
-  margin-bottom: 2px;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  margin: 0 0 var(--space-2) var(--space-1);
 }
 
 .extraToggle:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 64%, transparent);
+  border-color: var(--border);
   color: var(--text-secondary);
 }
 
@@ -34,7 +38,7 @@
 }
 
 .extraOpen {
-  max-height: 200px;
+  max-height: 240px;
   opacity: 1;
   margin-bottom: var(--space-3);
 }
@@ -45,7 +49,11 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
-  padding: 0 0 10px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-secondary) 62%, transparent);
 }
 
 .referenceThumbs {
@@ -56,8 +64,8 @@
 }
 
 .referenceThumb {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -108,20 +116,21 @@
 .inputBar {
   display: flex;
   flex-direction: row;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   background: var(--bg-secondary);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3) var(--space-4);
-  box-shadow: var(--shadow-whisper);
+  border-radius: var(--radius-xl);
+  padding: 10px 12px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ffffff 42%, transparent), var(--shadow-whisper);
   position: relative;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .inputBar:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring), var(--shadow-whisper);
+  background: color-mix(in srgb, var(--bg-secondary) 92%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border-strong));
+  box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-whisper);
 }
 
 .textarea {
@@ -134,7 +143,9 @@
   resize: none;
   overflow: hidden;
   font-family: inherit;
-  line-height: 1.5;
+  line-height: 1.55;
+  min-height: 24px;
+  padding: 6px 2px;
 }
 
 .textarea::placeholder {
@@ -142,17 +153,18 @@
 }
 
 .attachBtn {
-  width: 36px;
-  height: 36px;
-  border: 1px dashed var(--ring);
-  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
-  background: transparent;
+  background: var(--bg-primary);
+  flex-shrink: 0;
 }
 
 .attachBtn:hover {
@@ -162,17 +174,18 @@
 }
 
 .sendBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   background: var(--accent);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-on-accent);
   cursor: pointer;
   border: none;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 72%, #141413);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -189,14 +202,15 @@
   background: var(--bg-tertiary);
   color: var(--text-muted);
   cursor: default;
+  box-shadow: 0 0 0 1px var(--border-strong);
   transform: none;
 }
 
 .stopBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   background: var(--error);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -205,6 +219,19 @@
   border: none;
   transition: background-color var(--transition-fast), transform var(--transition-fast);
   flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .inputBar {
+    border-radius: var(--radius-lg);
+    padding: 9px;
+  }
+  .attachBtn,
+  .sendBtn,
+  .stopBtn {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 .stopBtn:hover {

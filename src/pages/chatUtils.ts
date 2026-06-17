@@ -19,9 +19,7 @@ export const PHASES = [
 ];
 
 export function getVariants(msg: Message): Variant[] {
-  if (msg.variants) return msg.variants;
-  if (msg.imageBase64) return [{ imageBase64: msg.imageBase64, size: msg.size || 'auto', timestamp: msg.timestamp }];
-  return [];
+  return msg.variants || [];
 }
 
 export function getActiveVariant(msg: Message): Variant | null {

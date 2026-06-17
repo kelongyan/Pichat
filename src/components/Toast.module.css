@@ -21,8 +21,31 @@
   color: var(--text-primary);
   transform: translateX(120%);
   transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  max-width: 400px;
+  max-width: 460px;
   box-shadow: var(--shadow-lg);
+}
+
+.message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.actionBtn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+  white-space: nowrap;
+}
+
+.actionBtn:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 .icon {

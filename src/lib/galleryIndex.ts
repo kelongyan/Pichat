@@ -1,5 +1,5 @@
 import type { Conversation, GalleryImage } from '../types';
-import { db, CONV_STORE, GALLERY_STORE, readRequest, waitForTx } from './db';
+import { getDB, CONV_STORE, GALLERY_STORE, readRequest, waitForTx } from './db';
 
 export interface GalleryIndexRecord extends GalleryImage {
   id: string;
@@ -14,10 +14,7 @@ function extractConversationImages(conv: Conversation): GalleryImage[] {
     for (let j = i - 1; j >= 0; j--) {
       if (conv.messages[j].role === 'user') { prompt = conv.messages[j].text || ''; break; }
     }
-    const variants = msg.variants
-      || (msg.variants === undefined && msg.imageBase64
-        ? [{ imageBase64: msg.imageBase64, size: msg.size || 'auto', timestamp: msg.timestamp }]
-        : []);
+    const variants = msg.variants || [];
     for (const v of variants) {
       if (v.imageId || v.imageBase64) {
         images.push({
@@ -53,7 +50,6 @@ export function extractImageIds(conv: Conversation): string[] {
   const ids = new Set<string>();
   for (const msg of conv.messages) {
     if (msg.role !== 'assistant') continue;
-    if (msg.imageBase64) continue;
     for (const variant of msg.variants || []) {
       if (variant.imageId) ids.add(variant.imageId);
     }
@@ -62,9 +58,10 @@ export function extractImageIds(conv: Conversation): string[] {
 }
 
 export async function syncGalleryForConversation(conv: Conversation): Promise<void> {
-  if (!db) return;
+  const database = getDB();
+  if (!database) return;
   const records = toGalleryRecords(conv);
-  const tx = db.transaction(GALLERY_STORE, 'readwrite');
+  const tx = database.transaction(GALLERY_STORE, 'readwrite');
   const store = tx.objectStore(GALLERY_STORE);
   const index = store.index('conversationId');
   const cursorRequest = index.openCursor(IDBKeyRange.only(conv.id));
@@ -85,8 +82,9 @@ export async function syncGalleryForConversation(conv: Conversation): Promise<vo
 }
 
 export async function deleteGalleryForConversation(conversationId: string): Promise<void> {
-  if (!db) return;
-  const tx = db.transaction(GALLERY_STORE, 'readwrite');
+  const database = getDB();
+  if (!database) return;
+  const tx = database.transaction(GALLERY_STORE, 'readwrite');
   const store = tx.objectStore(GALLERY_STORE);
   const index = store.index('conversationId');
   const cursorRequest = index.openCursor(IDBKeyRange.only(conversationId));
@@ -102,13 +100,14 @@ export async function deleteGalleryForConversation(conversationId: string): Prom
 }
 
 export async function ensureGalleryIndexBackfilled(): Promise<void> {
-  if (!db) return;
-  const countTx = db.transaction(GALLERY_STORE, 'readonly');
+  const database = getDB();
+  if (!database) return;
+  const countTx = database.transaction(GALLERY_STORE, 'readonly');
   const count = await readRequest(countTx.objectStore(GALLERY_STORE).count());
   await waitForTx(countTx);
   if (count > 0) return;
 
-  const convTx = db.transaction(CONV_STORE, 'readonly');
+  const convTx = database.transaction(CONV_STORE, 'readonly');
   const convs = await readRequest<Conversation[]>(convTx.objectStore(CONV_STORE).getAll());
   await waitForTx(convTx);
   for (const conv of convs) {

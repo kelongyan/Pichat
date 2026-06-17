@@ -38,7 +38,6 @@ export function ImageCard({
   const [src, setSrc] = useState(() =>
     imageBase64 ? toImageDataUrl(imageBase64) : ''
   );
-  const [fullSrc, setFullSrc] = useState('');
 
   useEffect(() => {
     setSrc(imageBase64 ? toImageDataUrl(imageBase64) : '');
@@ -49,9 +48,17 @@ export function ImageCard({
     let cancelled = false;
     const loadUrl = useThumbnail ? getThumbURL : getImageURL;
     loadUrl(imageId).then((url) => { if (!cancelled && url) setSrc(url); });
-    getImageURL(imageId).then((url) => { if (!cancelled && url) setFullSrc(url); });
     return () => { cancelled = true; };
   }, [imageId, useThumbnail]);
+
+  /** Lazily resolve the full-resolution image URL (only on user action). */
+  async function resolveFullSrc(): Promise<string> {
+    if (imageId) {
+      const url = await getImageURL(imageId);
+      if (url) return url;
+    }
+    return src;
+  }
 
   function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
@@ -73,7 +80,7 @@ export function ImageCard({
       const base64 = await getImageBase64(imageId);
       if (base64) return toImageDataUrl(base64);
     }
-    return fullSrc || src;
+    return resolveFullSrc();
   }
 
   function handleEdit(e: React.MouseEvent) {
@@ -93,13 +100,11 @@ export function ImageCard({
 
   function handleFullscreen(e: React.MouseEvent) {
     e.stopPropagation();
-    const fsSrc = fullSrc || src;
-    onFullscreen?.(fsSrc);
+    resolveFullSrc().then((fsSrc) => onFullscreen?.(fsSrc));
   }
 
   function handleCardClick() {
-    const fsSrc = fullSrc || src;
-    onFullscreen?.(fsSrc);
+    resolveFullSrc().then((fsSrc) => onFullscreen?.(fsSrc));
   }
 
   if (!src) return null;

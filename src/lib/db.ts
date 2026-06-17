@@ -1,5 +1,5 @@
 import type { Conversation } from '../types';
-import { setDB, saveImage, IMAGES_STORE } from './imageStore';
+import { saveImage, IMAGES_STORE } from './imageStore';
 
 export const DB_NAME = 'gpt2image';
 export const DB_VERSION = 3;
@@ -7,7 +7,12 @@ export const CONV_STORE = 'conversations';
 export const GALLERY_STORE = 'gallery_images';
 const LEGACY_KEY = 'gpt2image_conversations';
 
-export let db: IDBDatabase | null = null;
+let db: IDBDatabase | null = null;
+
+/** Centralized DB accessor. Returns null if not yet initialized. */
+export function getDB(): IDBDatabase | null {
+  return db;
+}
 
 export function readRequest<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -42,7 +47,6 @@ function openDB(): Promise<IDBDatabase> {
     };
     request.onsuccess = () => {
       db = request.result;
-      setDB(db);
       resolve(db);
     };
     request.onerror = () => reject(request.error);
@@ -50,7 +54,8 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 async function migrateFromLocalStorage() {
-  if (!db) return;
+  const database = getDB();
+  if (!database) return;
   const raw = localStorage.getItem(LEGACY_KEY);
   if (!raw) return;
   try {
@@ -59,7 +64,7 @@ async function migrateFromLocalStorage() {
       localStorage.removeItem(LEGACY_KEY);
       return;
     }
-    const tx = db.transaction(CONV_STORE, 'readwrite');
+    const tx = database.transaction(CONV_STORE, 'readwrite');
     const store = tx.objectStore(CONV_STORE);
     for (const conv of convs) {
       store.put(conv);
@@ -72,8 +77,9 @@ async function migrateFromLocalStorage() {
 }
 
 async function migrateImagesToBlobs() {
-  if (!db) return;
-  const tx = db.transaction(CONV_STORE, 'readonly');
+  const database = getDB();
+  if (!database) return;
+  const tx = database.transaction(CONV_STORE, 'readonly');
   const store = tx.objectStore(CONV_STORE);
   const request = store.getAll();
   const convs = await readRequest<Conversation[]>(request);
@@ -100,7 +106,7 @@ async function migrateImagesToBlobs() {
       }
     }
     if (changed) {
-      const wtx = db!.transaction(CONV_STORE, 'readwrite');
+      const wtx = database.transaction(CONV_STORE, 'readwrite');
       const wstore = wtx.objectStore(CONV_STORE);
       wstore.put(conv);
       await waitForTx(wtx);

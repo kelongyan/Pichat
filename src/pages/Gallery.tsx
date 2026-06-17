@@ -55,6 +55,7 @@ export default function Gallery() {
   const { open: openLightbox } = useLightbox();
   const toast = useToast();
   const getAllImages = useConversationStore((s) => s.getAllImages);
+  const galleryVersion = useConversationStore((s) => s.galleryVersion);
 
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -65,13 +66,14 @@ export default function Gallery() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoaded(false);
     getAllImages().then((page) => {
       if (cancelled) return;
       setImages(page);
       setLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [getAllImages]);
+  }, [getAllImages, galleryVersion]);
 
   useEffect(() => {
     return () => { revokeAll(); };

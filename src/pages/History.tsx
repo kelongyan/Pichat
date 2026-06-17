@@ -23,7 +23,6 @@ function findFirstImage(messages: Message[]): ThumbInfo | null {
         if (v.imageBase64) return { imageBase64: v.imageBase64 };
       }
     }
-    if (msg.imageBase64) return { imageBase64: msg.imageBase64 };
   }
   return null;
 }

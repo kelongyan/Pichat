@@ -37,9 +37,9 @@
 
   /* Shadows */
   --shadow-sm: 0 0 0 1px var(--border-strong);
-  --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(20, 20, 19, 0.02);
-  --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(20, 20, 19, 0.04);
-  --shadow-whisper: 0 4px 24px rgba(20, 20, 19, 0.03);
+  --shadow-md: 0 0 0 1px var(--ring), 0 8px 20px rgba(20, 20, 19, 0.035);
+  --shadow-lg: 0 0 0 1px var(--ring), 0 16px 42px rgba(20, 20, 19, 0.06);
+  --shadow-whisper: 0 8px 28px rgba(20, 20, 19, 0.035);
 
   /* Spacing */
   --space-1: 4px;
@@ -65,6 +65,7 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+  --radius-full: 999px;
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;

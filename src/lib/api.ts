@@ -11,6 +11,17 @@ const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 1500;
 
+export type ApiErrorType = 'auth' | 'cors' | 'not-found' | 'rate-limit' | 'network' | 'server' | 'unknown';
+
+export class ApiError extends Error {
+  errorType: ApiErrorType;
+  constructor(message: string, errorType: ApiErrorType) {
+    super(message);
+    this.name = 'ApiError';
+    this.errorType = errorType;
+  }
+}
+
 function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
@@ -24,55 +35,75 @@ async function classifyFetchError(err: unknown, url?: string): Promise<Error> {
     return err as Error;
   }
   if (err instanceof DOMException && err.name === 'TimeoutError') {
-    return new Error('Request timed out — the server may be overloaded. Try again later.');
+    return new ApiError('Request timed out — the server may be overloaded. Try again later.', 'server');
   }
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes('CORS') || msg.includes('blocked')) {
-    return new Error(
-      'CORS error: The API server does not allow browser requests. This API provider may only support server-side or desktop clients (e.g. Cherry Studio). Try a different API provider, or deploy Pichat behind a reverse proxy.'
+    return new ApiError(
+      'CORS error: The API server does not allow browser requests. This API provider may only support server-side or desktop clients (e.g. Cherry Studio). Try a different API provider, or deploy Pichat behind a reverse proxy.',
+      'cors'
     );
   }
   if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('ERR_')) {
     if (url) {
       try {
         await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(5000) });
-        return new Error(
-          'CORS error: The API server is reachable but blocks browser requests (CORS preflight failed). This API provider likely only supports server-side or desktop clients. Try a different provider, or deploy behind a reverse proxy.'
+        return new ApiError(
+          'CORS error: The API server is reachable but blocks browser requests (CORS preflight failed). This API provider likely only supports server-side or desktop clients. Try a different provider, or deploy behind a reverse proxy.',
+          'cors'
         );
       } catch {
         // server truly unreachable
       }
     }
-    return new Error(
-      'Cannot reach the API server. Check your network connection and verify the API Base URL in Settings.'
+    return new ApiError(
+      'Cannot reach the API server. Check your network connection and verify the API Base URL in Settings.',
+      'network'
     );
   }
-  return new Error(`Network error: ${msg}`);
+  return new ApiError(`Network error: ${msg}`, 'network');
 }
 
 function classifyHttpError(status: number, detail: string): Error {
   switch (status) {
     case 401:
-      return new Error('Authentication failed — check your API Key in Settings.');
+      return new ApiError('Authentication failed — check your API Key in Settings.', 'auth');
     case 403:
-      return new Error('Access denied — your API key may lack the required permissions.');
+      return new ApiError('Access denied — your API key may lack the required permissions.', 'auth');
     case 404:
-      return new Error('API endpoint not found — verify your API Base URL in Settings.');
+      return new ApiError('API endpoint not found — verify your API Base URL in Settings.', 'not-found');
     case 429:
-      return new Error('Rate limit exceeded — please wait a moment and try again.');
+      return new ApiError('Rate limit exceeded — please wait a moment and try again.', 'rate-limit');
     case 500:
     case 502:
     case 503:
     case 504:
-      return new Error(
-        `API server error (${status}) — this is a temporary upstream issue, not a bug. Try again later.`
+      return new ApiError(
+        `API server error (${status}) — this is a temporary upstream issue, not a bug. Try again later.`,
+        'server'
       );
     default:
-      return new Error(`API error ${status}: ${detail}`);
+      return new ApiError(`API error ${status}: ${detail}`, 'unknown');
   }
 }
 
 let cachedSystemPromptTemplate: string | null = null;
+let cachedSystemPromptVersion: string | null = null;
+
+const FRONT_MATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/;
+
+function parseFrontMatter(raw: string): { body: string; version: string | null } {
+  const match = raw.match(FRONT_MATTER_RE);
+  if (!match) return { body: raw, version: null };
+  const body = raw.slice(match[0].length);
+  const front = match[1];
+  const versionLine = front
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => /^version:/.test(l));
+  const version = versionLine ? versionLine.split(':', 2)[1].trim() : null;
+  return { body, version };
+}
 
 function injectPromptVariables(template: string): string {
   const vars: Record<string, string> = {
@@ -97,10 +128,24 @@ export async function preloadSystemPrompt(): Promise<void> {
   if (cachedSystemPromptTemplate !== null) return;
   try {
     const resp = await fetch('assets/system-prompt.md');
-    cachedSystemPromptTemplate = resp.ok ? await resp.text() : '';
+    if (!resp.ok) {
+      cachedSystemPromptTemplate = '';
+      cachedSystemPromptVersion = null;
+      return;
+    }
+    const raw = await resp.text();
+    const { body, version } = parseFrontMatter(raw);
+    cachedSystemPromptTemplate = body;
+    cachedSystemPromptVersion = version;
   } catch {
     cachedSystemPromptTemplate = '';
+    cachedSystemPromptVersion = null;
   }
+}
+
+/** Returns the parsed version field from system-prompt.md front-matter, or null. */
+export function getSystemPromptVersion(): string | null {
+  return cachedSystemPromptVersion;
 }
 
 async function getSystemPrompt(full: boolean): Promise<string> {
