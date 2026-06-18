@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Download, FileText, Plus, Trash2, Upload, ArrowLeft } from 'lucide-react';
+import { BarChart3, Database, Download, FileText, Plus, Settings as SettingsIcon, Trash2, Upload, ArrowLeft, Server, Sliders, PieChart } from 'lucide-react';
 import { useToast } from '../components/Toast';
 import { ProviderCard } from './ProviderCard';
 import { generateId, useConfigStore } from '../lib/store';
@@ -15,6 +15,16 @@ import { ConnectView } from './ConnectView';
 import styles from './Settings.module.css';
 
 const GITHUB_URL = 'https://github.com/kelongyan/Pichat';
+
+const NAV_ITEMS = [
+  { id: 'providers', label: 'Providers', icon: Server },
+  { id: 'general', label: 'General', icon: Sliders },
+  { id: 'data', label: 'Data', icon: Database },
+  { id: 'templates', label: 'Templates', icon: FileText },
+  { id: 'stats', label: 'Stats', icon: PieChart },
+] as const;
+
+type NavId = typeof NAV_ITEMS[number]['id'];
 
 function GithubIcon({ size = 24 }: { size?: number }) {
   return (
@@ -50,6 +60,7 @@ function FullSettings({ config }: { config: Config }) {
   const saveConfig = useConfigStore((s) => s.save);
   const importInputRef = useRef<HTMLInputElement>(null);
 
+  const [activeNav, setActiveNav] = useState<NavId>('providers');
   const [providers, setProviders] = useState<ProviderConfig[]>(() =>
     config.providers.length ? config.providers : [createProvider('Default')]
   );
@@ -168,7 +179,6 @@ function FullSettings({ config }: { config: Config }) {
     setProviders(sanitized);
     setDefaultProviderId(defaultId);
     showToast('Settings saved', { type: 'success' });
-    // Background health check for the default provider so users catch a broken key/baseURL early.
     void runHealthCheck(sanitized.find((p) => p.id === defaultId)!);
   }
 
@@ -191,120 +201,177 @@ function FullSettings({ config }: { config: Config }) {
         <div className={styles.spacer} />
       </div>
 
-      <div className={styles.pageBody}>
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Providers</div>
-          <div className={styles.providerList}>
-            {providers.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                isDefault={provider.id === defaultProviderId}
-                isTesting={testingId === provider.id}
-                canRemove={providers.length > 1}
-                onSetDefault={() => setDefaultProviderId(provider.id)}
-                onTest={() => handleTestProvider(provider)}
-                onRemove={() => handleRemoveProvider(provider.id)}
-                onUpdate={(patch) => updateProvider(provider.id, patch)}
-              />
-            ))}
-          </div>
-          <button className={styles.addBtn} type="button" onClick={handleAddProvider}>
-            <Plus size={16} /> Add Provider
-          </button>
-        </div>
+      <div className={styles.pageLayout}>
+        {/* 左侧导航 */}
+        <nav className={styles.sidebar}>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                className={`${styles.navItem}${activeNav === item.id ? ` ${styles.navItemActive}` : ''}`}
+                onClick={() => setActiveNav(item.id)}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Preferences</div>
-          <div className={styles.toggleRow}>
-            <div className={styles.toggleInfo}>
-              <span className={styles.toggleName}>System prompt</span>
-              <span className={styles.toggleDesc}>
-                Inject personality and style instructions
-                {promptVersion ? <span className={styles.metaTag}>v{promptVersion}</span> : null}
-              </span>
-            </div>
-            <label className="toggle-switch">
-              <input type="checkbox" checked={useSystemPrompt} onChange={(e) => setUseSystemPrompt(e.target.checked)} />
-              <span className="toggle-slider" />
-            </label>
-          </div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Data</div>
-          <div className={styles.actionRow}>
-            <button className={styles.actionBtn} type="button" onClick={handleExportData}>
-              <Download size={16} /> Export
-            </button>
-            <button className={styles.actionBtn} type="button" onClick={() => importInputRef.current?.click()}>
-              <Upload size={16} /> Import
-            </button>
-          </div>
-          <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleImportFile} />
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Prompt Templates</div>
-          <div className={styles.templateList}>
-            {templates.map((template) => (
-              <div key={template.id} className={styles.templateCard}>
-                <div className={styles.templateHeader}>
-                  <FileText size={14} />
-                  <input className="form-input" value={template.name} onChange={(e) => updateTemplate(template.id, { name: e.target.value })} placeholder="Template name" />
-                  <button className={styles.iconBtn} type="button" title="Remove" onClick={() => handleRemoveTemplate(template.id)}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <textarea className={`form-input ${styles.textarea}`} value={template.template} onChange={(e) => updateTemplate(template.id, { template: e.target.value })} placeholder="Use {prompt} for user input" rows={2} />
+        {/* 右侧内容 */}
+        <main className={styles.content}>
+          {/* Providers */}
+          {activeNav === 'providers' && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Providers</h3>
+              <p className={styles.sectionDesc}>Configure your AI image generation providers</p>
+              <div className={styles.providerList}>
+                {providers.map((provider) => (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    isDefault={provider.id === defaultProviderId}
+                    isTesting={testingId === provider.id}
+                    canRemove={providers.length > 1}
+                    onSetDefault={() => setDefaultProviderId(provider.id)}
+                    onTest={() => handleTestProvider(provider)}
+                    onRemove={() => handleRemoveProvider(provider.id)}
+                    onUpdate={(patch) => updateProvider(provider.id, patch)}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-          <div className={styles.actionRow}>
-            <button className={styles.actionBtn} type="button" onClick={handleAddTemplate}>
-              <Plus size={16} /> Add
-            </button>
-            <button className={styles.actionBtn} type="button" onClick={handleSaveTemplates}>
-              <FileText size={16} /> Save
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Provider Stats</div>
-          {providerStats.length === 0 ? (
-            <div className={styles.statsEmpty}>No generation stats yet</div>
-          ) : (
-            <div className={styles.statsList}>
-              {providerStats.map((stat) => (
-                <div key={stat.providerId} className={styles.statCard}>
-                  <div className={styles.statInfo}>
-                    <span className={styles.statName}>{stat.providerName || stat.providerId}</span>
-                    <span className={styles.statModel}>{stat.model || 'Unknown'}</span>
-                  </div>
-                  <div className={styles.statMetrics}>
-                    <span>{Math.round(stat.successRate * 100)}% success</span>
-                    <span>{stat.avgDurationMs}ms avg</span>
-                    <span>{stat.total} runs</span>
-                  </div>
-                </div>
-              ))}
+              <button className={styles.addBtn} type="button" onClick={handleAddProvider}>
+                <Plus size={16} /> Add Provider
+              </button>
             </div>
           )}
-          <button className={styles.actionBtn} type="button" onClick={refreshProviderStats} style={{ marginTop: 12 }}>
-            <BarChart3 size={16} /> Refresh
-          </button>
-        </div>
 
-        <button className={`btn-primary ${styles.saveMain}`} onClick={handleSave}>
-          Save Settings
-        </button>
+          {/* General */}
+          {activeNav === 'general' && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>General</h3>
+              <p className={styles.sectionDesc}>Configure general application preferences</p>
+              <div className={styles.settingCard}>
+                <div className={styles.settingRow}>
+                  <div className={styles.settingInfo}>
+                    <span className={styles.settingName}>System prompt</span>
+                    <span className={styles.settingDesc}>
+                      Inject personality and style instructions
+                      {promptVersion && <span className={styles.metaTag}>v{promptVersion}</span>}
+                    </span>
+                  </div>
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={useSystemPrompt} onChange={(e) => setUseSystemPrompt(e.target.checked)} />
+                    <span className="toggle-slider" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
-        <div className={styles.pageFooter}>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={styles.footerLink}>
-            <GithubIcon size={16} /> GitHub
-          </a>
-        </div>
+          {/* Data */}
+          {activeNav === 'data' && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Data</h3>
+              <p className={styles.sectionDesc}>Export or import your Pichat data</p>
+              <div className={styles.settingCard}>
+                <div className={styles.dataActions}>
+                  <button className={styles.dataBtn} type="button" onClick={handleExportData}>
+                    <Download size={18} />
+                    <div>
+                      <span className={styles.dataBtnTitle}>Export</span>
+                      <span className={styles.dataBtnDesc}>Download all conversations and settings</span>
+                    </div>
+                  </button>
+                  <button className={styles.dataBtn} type="button" onClick={() => importInputRef.current?.click()}>
+                    <Upload size={18} />
+                    <div>
+                      <span className={styles.dataBtnTitle}>Import</span>
+                      <span className={styles.dataBtnDesc}>Restore from a Pichat export file</span>
+                    </div>
+                  </button>
+                </div>
+                <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleImportFile} />
+              </div>
+            </div>
+          )}
+
+          {/* Templates */}
+          {activeNav === 'templates' && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Templates</h3>
+              <p className={styles.sectionDesc}>Manage your prompt templates for quick access</p>
+              <div className={styles.templateList}>
+                {templates.map((template) => (
+                  <div key={template.id} className={styles.templateCard}>
+                    <div className={styles.templateHeader}>
+                      <FileText size={14} />
+                      <input className="form-input" value={template.name} onChange={(e) => updateTemplate(template.id, { name: e.target.value })} placeholder="Template name" />
+                      <button className={styles.iconBtn} type="button" title="Remove" onClick={() => handleRemoveTemplate(template.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <textarea className={`form-input ${styles.textarea}`} value={template.template} onChange={(e) => updateTemplate(template.id, { template: e.target.value })} placeholder="Use {prompt} for user input" rows={2} />
+                  </div>
+                ))}
+              </div>
+              <div className={styles.actionRow}>
+                <button className={styles.actionBtn} type="button" onClick={handleAddTemplate}>
+                  <Plus size={16} /> Add
+                </button>
+                <button className={styles.actionBtn} type="button" onClick={handleSaveTemplates}>
+                  <FileText size={16} /> Save
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Stats */}
+          {activeNav === 'stats' && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Stats</h3>
+              <p className={styles.sectionDesc}>View provider performance statistics</p>
+              <div className={styles.settingCard}>
+                {providerStats.length === 0 ? (
+                  <div className={styles.statsEmpty}>No generation stats yet</div>
+                ) : (
+                  <div className={styles.statsList}>
+                    {providerStats.map((stat) => (
+                      <div key={stat.providerId} className={styles.statCard}>
+                        <div className={styles.statInfo}>
+                          <span className={styles.statName}>{stat.providerName || stat.providerId}</span>
+                          <span className={styles.statModel}>{stat.model || 'Unknown'}</span>
+                        </div>
+                        <div className={styles.statMetrics}>
+                          <span>{Math.round(stat.successRate * 100)}% success</span>
+                          <span>{stat.avgDurationMs}ms avg</span>
+                          <span>{stat.total} runs</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button className={styles.actionBtn} type="button" onClick={refreshProviderStats} style={{ marginTop: 12 }}>
+                  <BarChart3 size={16} /> Refresh
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Save Button */}
+          <div className={styles.saveRow}>
+            <button className={`btn-primary ${styles.saveBtn}`} onClick={handleSave}>
+              Save Settings
+            </button>
+          </div>
+        </main>
+      </div>
+
+      <div className={styles.pageFooter}>
+        <a className={styles.footerLink} href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
+          <GithubIcon size={16} /> GitHub
+        </a>
       </div>
     </div>
   );

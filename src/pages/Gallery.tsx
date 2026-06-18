@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Columns2, Image as ImageIcon, Search, Star, Tags, X } from 'lucide-react';
+import { Image as ImageIcon, Search, Star, X } from 'lucide-react';
 import { Header } from '../components/Header';
 import { ImageCard } from '../components/ImageCard';
 import { EmptyState } from '../components/EmptyState';
@@ -162,50 +162,25 @@ export default function Gallery() {
       {images.length > 0 && (
         <div className={`${styles.shell} fade-in`}>
           <div className={styles.toolbar}>
-            <label className={styles.search} aria-label="Search gallery">
-              <Search size={15} />
-              <input
-                value={filters.query}
-                onChange={(e) => updateFilters({ query: e.target.value })}
-                placeholder="Search prompt, tag, provider..."
-              />
-            </label>
-            <button
-              className={`${styles.filterBtn}${filters.favoriteOnly ? ` ${styles.filterBtnActive}` : ''}`}
-              type="button"
-              aria-pressed={filters.favoriteOnly}
-              onClick={() => updateFilters({ favoriteOnly: !filters.favoriteOnly })}
-            >
-              <Star size={14} fill={filters.favoriteOnly ? 'currentColor' : 'none'} />
-              <span>Favorites</span>
-            </button>
-            <select value={filters.provider} onChange={(e) => updateFilters({ provider: e.target.value })}>
-              <option value="">All Providers</option>
-              {providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
-            </select>
-            <select value={filters.model} onChange={(e) => updateFilters({ model: e.target.value })}>
-              <option value="">All Models</option>
-              {models.map((model) => <option key={model} value={model}>{model}</option>)}
-            </select>
-            <select value={filters.tag} onChange={(e) => updateFilters({ tag: e.target.value })}>
-              <option value="">All Tags</option>
-              {tags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-            </select>
-            <select value={filters.sort} onChange={(e) => updateFilters({ sort: e.target.value as GalleryFilterState['sort'] })}>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
-            {hasFilters && (
+            <div className={styles.searchRow}>
+              <label className={styles.search} aria-label="Search gallery">
+                <Search size={16} />
+                <input
+                  value={filters.query}
+                  onChange={(e) => updateFilters({ query: e.target.value })}
+                  placeholder="Search prompt..."
+                />
+              </label>
               <button
-                className={styles.clearBtn}
+                className={`${styles.favoriteBtn}${filters.favoriteOnly ? ` ${styles.favoriteBtnActive}` : ''}`}
                 type="button"
-                title="Clear filters"
-                aria-label="Clear filters"
-                onClick={() => setFilters(DEFAULT_FILTERS)}
+                aria-pressed={filters.favoriteOnly}
+                onClick={() => updateFilters({ favoriteOnly: !filters.favoriteOnly })}
               >
-                <X size={15} />
+                <Star size={15} fill={filters.favoriteOnly ? 'currentColor' : 'none'} />
+                <span>Favorites</span>
               </button>
-            )}
+            </div>
           </div>
 
           {filteredImages.length === 0 ? (
@@ -216,63 +191,21 @@ export default function Gallery() {
                 const key = buildGalleryImageKey(img);
                 const entry = meta[key] || {};
                 const comparing = compareKeys.includes(key);
-                const tagsText = tagDrafts[key] ?? (entry.tags || []).join(', ');
-
-                let itemClass = styles.item;
-                if (entry.favorite) itemClass += ` ${styles.itemFavorite}`;
-                if (comparing) itemClass += ` ${styles.itemComparing}`;
 
                 return (
-                  <div key={key} className={itemClass}>
-                    <ImageCard
-                      imageId={img.imageId}
-                      imageBase64={img.imageBase64}
-                      size={img.size}
-                      prompt={img.prompt}
-                      timestamp={img.timestamp}
-                      useThumbnail
-                      onEdit={handleEdit}
-                      onFullscreen={() => handleFullscreen(img)}
-                      onCopyPrompt={() => handleCopyPrompt(img.prompt)}
-                      onAction={(action, src) => handleAction(action, src, img)}
-                    />
-                    <div className={styles.itemMeta}>
-                      <button
-                        className={`${styles.metaBtn}${entry.favorite ? ` ${styles.metaBtnActive}` : ''}`}
-                        type="button"
-                        title={entry.favorite ? 'Remove favorite' : 'Add favorite'}
-                        aria-pressed={!!entry.favorite}
-                        onClick={() => handleFavorite(img)}
-                      >
-                        <Star size={14} fill={entry.favorite ? 'currentColor' : 'none'} />
-                      </button>
-                      <button
-                        className={`${styles.metaBtn}${comparing ? ` ${styles.metaBtnActive}` : ''}`}
-                        type="button"
-                        title="Add to compare"
-                        aria-pressed={comparing}
-                        onClick={() => toggleCompare(img)}
-                      >
-                        <Columns2 size={14} />
-                      </button>
-                      <label className={styles.tagInput}>
-                        <Tags size={13} />
-                        <input
-                          value={tagsText}
-                          onChange={(e) => setTagDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
-                          onBlur={() => saveTags(img)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              saveTags(img);
-                              (e.currentTarget as HTMLInputElement).blur();
-                            }
-                          }}
-                          placeholder="tags"
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  <ImageCard
+                    key={key}
+                    imageId={img.imageId}
+                    imageBase64={img.imageBase64}
+                    size={img.size}
+                    prompt={img.prompt}
+                    timestamp={img.timestamp}
+                    useThumbnail
+                    onEdit={handleEdit}
+                    onFullscreen={() => handleFullscreen(img)}
+                    onCopyPrompt={() => handleCopyPrompt(img.prompt)}
+                    onAction={(action, src) => handleAction(action, src, img)}
+                  />
                 );
               })}
             </div>

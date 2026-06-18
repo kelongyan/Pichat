@@ -54,9 +54,9 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
 
   return (
     <div className={styles.header} ref={headerRef}>
-      <div className={styles.logo} onClick={() => navigate('/create')}>
+      <div className={styles.logoArea} onClick={() => navigate('/create')}>
         <img src="assets/logo.png" alt="Pichat" className={styles.logoIcon} />
-        <span className={styles.logoText}>Pichat</span>
+        <span className={styles.brandTagline}>将你的想象，染成永恒</span>
       </div>
       <div className={styles.actions}>
         {showNewChat && (
@@ -66,14 +66,16 @@ export function Header({ activeTab = 'create', showNewChat = false }: HeaderProp
           </button>
         )}
         <div className={styles.tabs}>
-          {TABS.map((t) => (
-            <div
-              key={t.id}
-              className={`${styles.tab}${t.id === activeTab ? ` ${styles.tabActive}` : ''}`}
-              onClick={() => handleTab(t.id)}
-            >
-              {t.label}
-            </div>
+          {TABS.map((t, i) => (
+            <span key={t.id} style={{ display: 'flex', alignItems: 'center' }}>
+              {i > 0 && <span className={styles.tabDot}>·</span>}
+              <div
+                className={`${styles.tab}${t.id === activeTab ? ` ${styles.tabActive}` : ''}`}
+                onClick={() => handleTab(t.id)}
+              >
+                {t.label}
+              </div>
+            </span>
           ))}
         </div>
         <button

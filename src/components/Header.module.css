@@ -18,34 +18,41 @@
   display: none;
 }
 
-.logo {
+/* Logo Area */
+.logoArea {
   display: flex;
-  flex-direction: row;
-  gap: 10px;
   align-items: center;
+  gap: 12px;
   cursor: pointer;
-  min-height: 40px;
-  padding: 0 8px 0 2px;
-  border-radius: var(--radius-full);
-  transition: background var(--transition-fast);
-}
-
-.logo:hover {
-  background: color-mix(in srgb, var(--bg-secondary) 58%, transparent);
 }
 
 .logoIcon {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
+  border-radius: 50%;
+  animation: header-breathe 3s ease-in-out infinite;
 }
 
-.logoText {
-  font-family: var(--font-serif);
+.brandTagline {
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 18px;
-  font-weight: 500;
-  color: var(--text-primary);
-  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Breathing Animation */
+@keyframes header-breathe {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(196, 149, 106, 0.15);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(196, 149, 106, 0.3);
+    transform: scale(1.03);
+  }
 }
 
 .actions {
@@ -106,51 +113,51 @@
   align-items: center;
   gap: 6px;
   min-height: 36px;
-  padding: 0 13px 0 11px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-secondary);
+  padding: 0 8px;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast);
   margin-left: var(--space-1);
 }
 
 .settingsBtn:hover {
-  background: var(--bg-hover);
-  border-color: var(--ring);
   color: var(--text-primary);
 }
 
 .tabs {
   display: flex;
   flex-direction: row;
-  gap: 2px;
-  background: color-mix(in srgb, var(--bg-tertiary) 72%, var(--bg-primary));
-  border-radius: var(--radius-full);
-  padding: 4px;
-  box-shadow: 0 0 0 1px var(--border-strong), inset 0 1px 0 color-mix(in srgb, #ffffff 38%, transparent);
+  align-items: center;
+  gap: 0;
+}
+
+.tabDot {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin: 0 12px;
+  user-select: none;
 }
 
 .tab {
   min-height: 30px;
-  padding: 0 15px;
-  border-radius: var(--radius-full);
+  padding: 0 4px;
   display: flex;
   align-items: center;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition: color var(--transition-fast), font-weight var(--transition-fast);
+  letter-spacing: 0.02em;
 }
 
 .tabActive {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 82%, transparent), 0 1px 3px rgba(20, 20, 19, 0.04);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .tab:hover {
@@ -199,9 +206,61 @@
   background: var(--bg-tertiary);
 }
 
-/* Dark theme */
+/* Dark theme enhancements */
 :global([data-theme="dark"]) .logoIcon {
   filter: invert(1) brightness(0.9);
+  animation: header-breathe-dark 3s ease-in-out infinite;
+}
+
+:global([data-theme="dark"]) .brandTagline {
+  color: #8b949e;
+}
+
+@keyframes header-breathe-dark {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(212, 165, 116, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(212, 165, 116, 0.35);
+    transform: scale(1.03);
+  }
+}
+
+:global([data-theme="dark"]) .header {
+  background: color-mix(in srgb, #0d1117 92%, transparent);
+  border-bottom-color: #21262d;
+}
+
+:global([data-theme="dark"]) .tabDot {
+  color: #484f58;
+}
+
+:global([data-theme="dark"]) .tabActive {
+  color: #d4a574;
+}
+
+:global([data-theme="dark"]) .btn {
+  background: #161b22;
+  box-shadow: 0 0 0 1px #30363d;
+}
+
+:global([data-theme="dark"]) .btn:hover {
+  background: #21262d;
+}
+
+:global([data-theme="dark"]) .iconBtn {
+  background: rgba(22, 27, 34, 0.6);
+}
+
+:global([data-theme="dark"]) .iconBtn:hover {
+  background: #161b22;
+  border-color: #30363d;
+}
+
+:global([data-theme="dark"]) .mobileMenu {
+  background: color-mix(in srgb, #0d1117 96%, transparent);
+  border-bottom-color: #21262d;
 }
 
 @media (max-width: 640px) {

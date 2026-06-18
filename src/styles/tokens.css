@@ -1,45 +1,45 @@
 /* =======================================================
    Pichat — Design Tokens
-   暖色羊皮纸 · 优雅衬线排版 · 极简环形层级
+   深邃墨蓝 · 午夜画廊 · 香槟金点缀
    ======================================================= */
 
 :root {
   /* Colors - Light Theme (default) */
-  --bg-primary: #f5f4ed;
-  --bg-secondary: #faf9f5;
-  --bg-tertiary: #e8e6dc;
-  --bg-hover: #e3e1d5;
-  --bg-chat-user: #e8e6dc;
-  --bg-chat-ai: #faf9f5;
+  --bg-primary: #f8f7f4;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eceae4;
+  --bg-hover: #e8e6e0;
+  --bg-chat-user: #eceae4;
+  --bg-chat-ai: #ffffff;
 
-  --border: #f0eee6;
-  --border-strong: #e8e6dc;
-  --border-subtle: #f9f8f3;
+  --border: #e8e6e0;
+  --border-strong: #d4d2cc;
+  --border-subtle: #f0efe9;
 
-  --text-primary: #141413;
-  --text-secondary: #5e5d59;
-  --text-tertiary: #87867f;
-  --text-muted: #b0aea5;
-  --text-on-accent: #faf9f5;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5a5a58;
+  --text-tertiary: #8a8a88;
+  --text-muted: #b0b0ae;
+  --text-on-accent: #ffffff;
 
-  --accent: #c96442;
-  --accent-hover: #b55333;
-  --accent-light: #fbeee9;
-  --accent-coral: #d97757;
+  --accent: #c4956a;
+  --accent-hover: #b3845a;
+  --accent-light: #faf5ef;
+  --accent-coral: #d4a574;
 
-  --error: #b53333;
-  --error-light: #fbeaea;
-  --success: #2f8f5b;
-  --success-light: #edf8f1;
-  --focus-ring: rgba(56, 152, 236, 0.4);
+  --error: #dc3545;
+  --error-light: #fef2f2;
+  --success: #28a745;
+  --success-light: #f0fdf4;
+  --focus-ring: rgba(196, 149, 106, 0.4);
 
-  --ring: #d1cfc5;
+  --ring: #d4d2cc;
 
   /* Shadows */
   --shadow-sm: 0 0 0 1px var(--border-strong);
-  --shadow-md: 0 0 0 1px var(--ring), 0 8px 20px rgba(20, 20, 19, 0.035);
-  --shadow-lg: 0 0 0 1px var(--ring), 0 16px 42px rgba(20, 20, 19, 0.06);
-  --shadow-whisper: 0 8px 28px rgba(20, 20, 19, 0.035);
+  --shadow-md: 0 0 0 1px var(--ring), 0 8px 20px rgba(26, 26, 26, 0.06);
+  --shadow-lg: 0 0 0 1px var(--ring), 0 16px 42px rgba(26, 26, 26, 0.1);
+  --shadow-whisper: 0 8px 28px rgba(26, 26, 26, 0.06);
 
   /* Spacing */
   --space-1: 4px;
@@ -68,7 +68,7 @@
   --radius-full: 999px;
 
   /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Libre Baskerville', 'Noto Serif SC', Georgia, serif;
   --font-serif: 'Libre Baskerville', 'Noto Serif SC', Georgia, serif;
   --font-mono: 'Courier New', Courier, monospace;
 
@@ -76,37 +76,48 @@
   --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Champagne Gold Gradient */
+  --gradient-champagne: linear-gradient(135deg, #c4956a 0%, #d4a574 50%, #e8b88a 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(196, 149, 106, 0.2) 0%, rgba(212, 165, 116, 0.1) 100%);
 }
 
-/* Dark Theme */
+/* Dark Theme - 午夜画廊 */
 [data-theme="dark"] {
-  --bg-primary: #141413;
-  --bg-secondary: #222220;
-  --bg-tertiary: #30302e;
-  --bg-hover: #3d3d3b;
-  --bg-chat-user: #30302e;
-  --bg-chat-ai: #222220;
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --bg-hover: #252b33;
+  --bg-chat-user: #1c2128;
+  --bg-chat-ai: #161b22;
 
-  --border: #30302e;
-  --border-strong: #3d3d3b;
-  --border-subtle: #1c1c1b;
+  --border: #21262d;
+  --border-strong: #30363d;
+  --border-subtle: #161b22;
 
-  --text-primary: #faf9f5;
-  --text-secondary: #b0aea5;
-  --text-tertiary: #87867f;
-  --text-muted: #5e5d59;
-  --text-on-accent: #faf9f5;
+  --text-primary: #e6edf3;
+  --text-secondary: #b0b8c4;
+  --text-tertiary: #7d8590;
+  --text-muted: #484f58;
+  --text-on-accent: #0d1117;
 
-  --accent: #d97757;
-  --accent-hover: #c96442;
-  --accent-light: #2d1d18;
-  --error-light: #351818;
-  --success: #54c582;
-  --success-light: #153522;
+  --accent: #d4a574;
+  --accent-hover: #c4956a;
+  --accent-light: #1a1612;
+  --accent-coral: #e8b88a;
+  --error: #f85149;
+  --error-light: #1a0e0e;
+  --success: #3fb950;
+  --success-light: #0d1a12;
+  --focus-ring: rgba(212, 165, 116, 0.3);
 
-  --ring: #3d3d3b;
+  --ring: #30363d;
   --shadow-sm: 0 0 0 1px var(--border-strong);
-  --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(0, 0, 0, 0.15);
-  --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.25);
-  --shadow-whisper: 0 4px 24px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-whisper: 0 4px 24px rgba(0, 0, 0, 0.3);
+
+  /* Champagne Gold Gradient - Dark Mode */
+  --gradient-champagne: linear-gradient(135deg, #d4a574 0%, #e8b88a 50%, #f0c8a0 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(212, 165, 116, 0.15) 0%, rgba(232, 184, 138, 0.08) 100%);
 }

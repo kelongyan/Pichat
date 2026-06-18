@@ -121,6 +121,14 @@ export const InputBar = forwardRef<InputBarHandle, InputBarProps>(function Input
     if (isGenerating) return;
     const prompt = text.trim();
     if (!prompt) return;
+
+    // Add ink drop animation on send
+    const sendBtn = document.querySelector(`.${styles.sendBtn}`);
+    if (sendBtn) {
+      sendBtn.classList.add(styles.sendBtnAnimating);
+      setTimeout(() => sendBtn.classList.remove(styles.sendBtnAnimating), 600);
+    }
+
     onSend({
       prompt,
       generationPrompt,

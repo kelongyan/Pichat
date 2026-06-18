@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Download, Pencil, Maximize2, Copy, Sparkles } from 'lucide-react';
+import { Download, Pencil, Maximize2, Copy, Sparkles, Star, Columns2, Tags } from 'lucide-react';
 import { buildImageFilename } from '../lib/filename';
 import { getImageURL, getThumbURL, getImageBlob, getImageBase64, toImageDataUrl } from '../lib/imageStore';
 import { getImageActionLabel, type ImageAction } from '../lib/imageActions';
 import { downloadBlob } from '../lib/download';
 import styles from './ImageCard.module.css';
 
-type CardImageAction = Exclude<ImageAction, 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
+type CardImageAction = Exclude<ImageAction, 'same' | 'copy' | 'realistic' | 'illustration' | 'clean' | 'cinematic'>;
 
-const CARD_ACTIONS: CardImageAction[] = ['same', 'style', 'background', 'ratio'];
+const CARD_ACTIONS: CardImageAction[] = ['style', 'background', 'ratio'];
 
 interface ImageCardProps {
   imageBase64?: string;
@@ -17,10 +17,17 @@ interface ImageCardProps {
   prompt?: string;
   timestamp?: number;
   useThumbnail?: boolean;
+  favorite?: boolean;
+  comparing?: boolean;
+  tagsText?: string;
   onEdit?: (src: string) => void;
   onFullscreen?: (src: string) => void;
   onCopyPrompt?: () => void;
   onAction?: (action: CardImageAction, src: string) => void;
+  onFavorite?: () => void;
+  onCompare?: () => void;
+  onTagsChange?: (value: string) => void;
+  onTagsBlur?: () => void;
 }
 
 export function ImageCard({
@@ -30,10 +37,17 @@ export function ImageCard({
   prompt,
   timestamp,
   useThumbnail = false,
+  favorite = false,
+  comparing = false,
+  tagsText = '',
   onEdit,
   onFullscreen,
   onCopyPrompt,
   onAction,
+  onFavorite,
+  onCompare,
+  onTagsChange,
+  onTagsBlur,
 }: ImageCardProps) {
   const [src, setSrc] = useState(() =>
     imageBase64 ? toImageDataUrl(imageBase64) : ''
@@ -103,6 +117,16 @@ export function ImageCard({
     resolveFullSrc().then((fsSrc) => onFullscreen?.(fsSrc));
   }
 
+  function handleFavorite(e: React.MouseEvent) {
+    e.stopPropagation();
+    onFavorite?.();
+  }
+
+  function handleCompare(e: React.MouseEvent) {
+    e.stopPropagation();
+    onCompare?.();
+  }
+
   function handleCardClick() {
     resolveFullSrc().then((fsSrc) => onFullscreen?.(fsSrc));
   }
@@ -113,52 +137,64 @@ export function ImageCard({
     <div className={styles.imageCard} onClick={handleCardClick}>
       <img src={src} alt="Generated image" loading="lazy" />
       <div className={styles.overlay}>
-        <span className={styles.badge}>{size}</span>
-        <button
-          className={`${styles.cardBtn} ${styles.download}`}
-          title="Download"
-          onClick={handleDownload}
-        >
-          <Download size={14} />
-        </button>
-        {(onCopyPrompt || onAction) && (
-          <div className={styles.actionStack}>
-            {onCopyPrompt && (
-              <button
-                className={styles.cardBtn}
-                title="Copy prompt"
-                onClick={handleCopyPrompt}
-              >
-                <Copy size={12} /> Copy
-              </button>
-            )}
-            {onAction && CARD_ACTIONS.map((action) => (
-              <button
-                key={action}
-                className={styles.cardBtn}
-                title={`${getImageActionLabel(action)} from this image`}
-                onClick={(e) => handleAction(e, action)}
-              >
-                <Sparkles size={11} />
-                {getImageActionLabel(action)}
-              </button>
-            ))}
+        {/* 顶部：尺寸标签 + 下载/全屏 */}
+        <div className={styles.overlayTop}>
+          <span className={styles.badge}>{size}</span>
+          <div className={styles.topActions}>
+            <button
+              className={`${styles.cardBtn} ${styles.cardBtnIcon}`}
+              title="Download"
+              onClick={handleDownload}
+            >
+              <Download size={13} />
+            </button>
+            <button
+              className={`${styles.cardBtn} ${styles.cardBtnIcon}`}
+              title="Fullscreen"
+              onClick={handleFullscreen}
+            >
+              <Maximize2 size={13} />
+            </button>
           </div>
-        )}
-        <button
-          className={`${styles.cardBtn} ${styles.edit}`}
-          title="Edit with this image as reference"
-          onClick={handleEdit}
-        >
-          <Pencil size={12} /> Edit
-        </button>
-        <button
-          className={`${styles.cardBtn} ${styles.fullscreen}`}
-          title="Fullscreen"
-          onClick={handleFullscreen}
-        >
-          <Maximize2 size={14} />
-        </button>
+        </div>
+
+        {/* 底部：Prompt + 操作按钮 */}
+        <div className={styles.overlayBottom}>
+          {prompt && <div className={styles.promptText}>{prompt}</div>}
+          <div className={styles.actionRow}>
+            <div className={styles.actionGroup}>
+              {onCopyPrompt && (
+                <button
+                  className={styles.cardBtn}
+                  title="Copy prompt"
+                  onClick={handleCopyPrompt}
+                >
+                  <Copy size={11} /> Copy
+                </button>
+              )}
+              {onAction && CARD_ACTIONS.map((action) => (
+                <button
+                  key={action}
+                  className={styles.cardBtn}
+                  title={`${getImageActionLabel(action)} from this image`}
+                  onClick={(e) => handleAction(e, action)}
+                >
+                  <Sparkles size={11} />
+                  {getImageActionLabel(action)}
+                </button>
+              ))}
+              {onEdit && (
+                <button
+                  className={styles.cardBtn}
+                  title="Edit with this image as reference"
+                  onClick={handleEdit}
+                >
+                  <Pencil size={11} /> Edit
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

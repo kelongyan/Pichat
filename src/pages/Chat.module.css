@@ -440,3 +440,69 @@
     width: 100%;
   }
 }
+
+/* Dark Mode Enhancements */
+:global([data-theme="dark"]) .promptCard {
+  background: #1c2128;
+  border-color: #30363d;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:global([data-theme="dark"]) .resultCard {
+  background: #161b22;
+  border-color: #21262d;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+:global([data-theme="dark"]) .bubbleUser {
+  background: #1c2128;
+  border-color: #30363d;
+}
+
+:global([data-theme="dark"]) .bubbleAi {
+  background: #161b22;
+  border-color: #21262d;
+}
+
+:global([data-theme="dark"]) .retry {
+  background: #161b22;
+  border-color: #30363d;
+}
+
+:global([data-theme="dark"]) .retry:hover {
+  background: #21262d;
+  border-color: var(--accent);
+}
+
+:global([data-theme="dark"]) .variantBtn {
+  background: #161b22;
+  border-color: #30363d;
+}
+
+:global([data-theme="dark"]) .variantBtn:hover {
+  background: #21262d;
+  border-color: var(--accent);
+}
+
+:global([data-theme="dark"]) .timeline {
+  background: #161b22;
+  border-color: #21262d;
+}
+
+:global([data-theme="dark"]) .skeleton {
+  background: #1c2128;
+  border-color: #21262d;
+}
+
+:global([data-theme="dark"]) .skeleton::before {
+  border-color: #30363d;
+}
+
+:global([data-theme="dark"]) .imageFrame {
+  background: #161b22;
+  border-color: #21262d;
+}
+
+:global([data-theme="dark"]) .imageFrame :global(.image-card) img {
+  background: #161b22;
+}

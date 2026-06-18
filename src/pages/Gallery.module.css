@@ -4,90 +4,107 @@
   gap: 20px;
 }
 
+/* ==================== 工具栏容器 ==================== */
 .toolbar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 20px var(--space-5) 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px var(--space-5) 0;
   max-width: 1240px;
   width: 100%;
   margin: 0 auto;
 }
 
+/* ==================== 搜索行 ==================== */
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ==================== 搜索框 - 液态玻璃 ==================== */
 .search {
-  min-width: min(360px, 100%);
-  flex: 1 1 280px;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 38px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-full);
-  background: var(--bg-secondary);
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 40%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   color: var(--text-tertiary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 20%, transparent);
 }
 
-.search input,
-.toolbar select {
+.search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
+}
+
+.search input {
   border: none;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
+  font-size: 16px;
   outline: none;
-}
-
-.search input {
   width: 100%;
 }
 
-.toolbar select {
-  min-height: 38px;
-  padding: 0 32px 0 var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-full);
-  background: var(--bg-secondary);
+.search input::placeholder {
+  color: var(--text-tertiary);
+  font-weight: 300;
 }
 
-.filterBtn,
-.clearBtn,
-.metaBtn {
-  min-height: 38px;
-  display: inline-flex;
+/* ==================== Favorites 按钮 ==================== */
+.favoriteBtn {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-secondary);
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 40%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: 650;
-  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  transition: all var(--transition-fast);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 20%, transparent);
+  white-space: nowrap;
 }
 
-.filterBtnActive,
-.metaBtnActive {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--accent-light);
-}
-
-.clearBtn {
-  width: 38px;
-  justify-content: center;
-}
-
-.filterBtn:hover,
-.clearBtn:hover,
-.metaBtn:hover {
-  transform: translateY(-1px);
-  border-color: var(--accent);
+.favoriteBtn:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 65%, transparent);
   color: var(--text-primary);
 }
 
+.favoriteBtnActive {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 25%, transparent);
+}
+
+/* ==================== 空状态 ==================== */
 .emptyState {
   padding: 44px var(--space-5) 56px;
   text-align: center;
@@ -95,73 +112,29 @@
   font-size: 14px;
 }
 
+/* ==================== 图片网格 ==================== */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
   padding: var(--space-5);
   max-width: 1240px;
   width: 100%;
   margin: 0 auto;
 }
 
-.grid :global(.image-card) img {
-  max-height: 320px;
-  object-fit: cover;
-}
-
-.item {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.itemFavorite :global(.image-card) {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-strong));
-}
-
-.itemComparing :global(.image-card) {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 52%, transparent), var(--shadow-whisper);
-}
-
-.itemMeta {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 0 2px;
-}
-
-.tagInput {
-  flex: 1 1 180px;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-full);
-  background: var(--bg-secondary);
-  color: var(--text-tertiary);
-}
-
-.tagInput input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  outline: none;
-}
-
-/* ---- Compare Panel ---- */
+/* ==================== Compare Panel ==================== */
 .comparePanel {
   margin: 0 auto var(--space-5);
   padding: var(--space-4);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-  box-shadow: var(--shadow-whisper);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 40%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 15%, transparent);
   max-width: calc(1240px - (var(--space-5) * 2));
   width: calc(100% - (var(--space-5) * 2));
 }
@@ -182,9 +155,9 @@
 .compareHeader button {
   width: 30px;
   height: 30px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 40%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
 }
@@ -205,8 +178,8 @@
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 40%, transparent);
 }
 
 .compareThumb span {
@@ -219,17 +192,24 @@
   -webkit-box-orient: vertical;
 }
 
-/* ---- Responsive ---- */
+/* ==================== 响应式 ==================== */
 @media (max-width: 640px) {
   .toolbar {
-    padding: 14px var(--space-4) 0;
+    padding: 16px var(--space-4) 0;
   }
-  .toolbar select,
-  .filterBtn {
-    flex: 1 1 140px;
+  .searchRow {
+    gap: 8px;
+  }
+  .search {
+    min-height: 44px;
+  }
+  .favoriteBtn {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 14px;
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--space-3);
     padding: var(--space-4);
   }

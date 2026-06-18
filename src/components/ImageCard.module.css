@@ -1,117 +1,209 @@
+/* ==================== 卡片容器 ==================== */
 .imageCard {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   cursor: pointer;
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow-whisper);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 50%, transparent);
   background: var(--bg-secondary);
-  transition: border-color var(--transition-normal), transform var(--transition-normal), box-shadow var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+  aspect-ratio: 4 / 3;
 }
 
 .imageCard:hover {
-  transform: translateY(-1.5px);
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-strong));
-  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
+/* ==================== 图片 ==================== */
 .imageCard img {
   display: block;
   width: 100%;
-  border-radius: var(--radius-md);
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
 }
 
+.imageCard:hover img {
+  transform: scale(1.03);
+}
+
+/* ==================== Hover Overlay ==================== */
 .overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 20, 19, 0.32), rgba(20, 20, 19, 0.12) 42%, rgba(20, 20, 19, 0.38));
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.2) 35%,
+    rgba(0, 0, 0, 0.2) 65%,
+    rgba(0, 0, 0, 0.75) 100%
+  );
   opacity: 0;
-  transition: opacity var(--transition-normal);
+  transition: opacity 0.3s ease;
   display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
 }
 
 .imageCard:hover .overlay {
   opacity: 1;
 }
 
-.badge {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  padding: 5px 10px;
-  background: rgba(20, 20, 19, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.9);
-  font-family: var(--font-sans);
-  font-weight: 500;
+/* ==================== 顶部区域 ==================== */
+.overlayTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.cardBtn {
-  position: absolute;
-  width: 36px;
-  height: 36px;
-  background: rgba(250, 249, 245, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius-md);
+.badge {
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.topActions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ==================== 底部区域 ==================== */
+.overlayBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Prompt 文本 */
+.promptText {
+  font-size: 13px;
+  color: #fff;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* 操作按钮行 */
+.actionRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.actionGroup {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ==================== 按钮基础样式 ==================== */
+.cardBtn {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  color: #141413;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: background var(--transition-fast), transform var(--transition-fast);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .cardBtn:hover {
-  background: #ffffff;
-  transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
 }
 
 .cardBtn:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
-.download {
-  top: var(--space-3);
-  right: var(--space-3);
+/* 图标按钮（无文字） */
+.cardBtnIcon {
+  width: 30px;
+  padding: 0;
 }
 
-.actionStack {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  right: 56px;
+/* ==================== 底部 meta 按钮（收藏/对比/标签）==================== */
+.metaRow {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  align-items: flex-start;
+  align-items: center;
+  padding: 8px 2px 0;
 }
 
-.actionStack .cardBtn {
-  position: static;
-  width: auto;
-  height: 30px;
+.metaBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 50%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.metaBtn:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+}
+
+.metaBtnActive {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.tagInput {
+  flex: 1;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 0 10px;
-  gap: 5px;
-  font-size: var(--font-size-xs);
-  font-weight: 500;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 50%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+  color: var(--text-tertiary);
 }
 
-.edit {
-  bottom: var(--space-3);
-  left: var(--space-3);
-  width: auto;
-  padding: 0 14px;
-  gap: 6px;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  border-radius: var(--radius-full);
+.tagInput input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
 }
 
-.fullscreen {
-  bottom: var(--space-3);
-  right: var(--space-3);
+.tagInput input::placeholder {
+  color: var(--text-tertiary);
 }

@@ -1,18 +1,34 @@
+/* Settings Toggle - Canvas Tab Style */
 .extraToggle {
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 30px;
+  min-height: 28px;
   padding: 0 10px 0 8px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   border: 1px solid transparent;
+  border-bottom: none;
   background: transparent;
   color: var(--text-tertiary);
   font-size: var(--font-size-sm);
   font-weight: 600;
+  font-family: var(--font-serif);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-  margin: 0 0 var(--space-2) var(--space-1);
+  margin: 0 0 0 var(--space-1);
+  position: relative;
+}
+
+.extraToggle::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  transform: scaleX(0);
+  transition: transform var(--transition-fast);
 }
 
 .extraToggle:hover {
@@ -21,29 +37,53 @@
   color: var(--text-secondary);
 }
 
+.extraToggle:hover::after {
+  transform: scaleX(1);
+}
+
 .extraToggle svg {
-  transition: transform 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.extraToggleOpen {
+  background: var(--bg-secondary);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .extraToggleOpen svg {
   transform: rotate(180deg);
 }
 
+.extraToggleOpen::after {
+  transform: scaleX(1);
+  background: var(--bg-secondary);
+}
+
+/* Bottom Panel */
 .extra {
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.2s ease;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.25s ease, padding 0.25s ease;
   margin-bottom: 0;
+  padding: 0;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
 }
 
 .extraOpen {
   max-height: 240px;
   opacity: 1;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding: var(--space-3);
+  border-color: var(--border-strong);
+  border-top: none;
+  margin-left: var(--space-1);
 }
 
-/* Reference Preview */
+/* Reference Preview - Gallery Style */
 .referencePreview {
   display: flex;
   align-items: center;
@@ -54,6 +94,40 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-secondary) 62%, transparent);
+  position: relative;
+}
+
+/* Decorative corner marks */
+.referencePreview::before,
+.referencePreview::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.referencePreview::before {
+  top: -1px;
+  left: -1px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.referencePreview::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.referencePreview:hover::before,
+.referencePreview:hover::after {
+  opacity: 1;
 }
 
 .referenceThumbs {
@@ -73,12 +147,27 @@
   background: var(--bg-secondary);
   padding: 0;
   box-shadow: var(--shadow-whisper);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  position: relative;
+}
+
+.referenceThumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, color-mix(in srgb, #ffffff 15%, transparent), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .referenceThumb:hover {
   border-color: var(--accent);
-  transform: translateY(-1px);
+  transform: translateY(-2px) rotate(-2deg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.referenceThumb:hover::after {
+  opacity: 1;
 }
 
 .referenceThumb:focus-visible {
@@ -105,14 +194,16 @@
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 600;
+  font-family: var(--font-serif);
 }
 
 .referenceHint {
   color: var(--text-tertiary);
   font-size: var(--font-size-sm);
+  font-style: italic;
 }
 
-/* Input Bar */
+/* Input Bar - Creative Canvas Style */
 .inputBar {
   display: flex;
   flex-direction: row;
@@ -125,12 +216,45 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, #ffffff 42%, transparent), var(--shadow-whisper);
   position: relative;
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  overflow: hidden;
+}
+
+/* Ink flow border effect */
+.inputBar::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--ink-angle, 0deg),
+    transparent 0%,
+    var(--accent) 10%,
+    transparent 20%
+  );
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  z-index: -1;
+  animation: inkFlow 3s linear infinite;
+}
+
+@property --ink-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes inkFlow {
+  to { --ink-angle: 360deg; }
 }
 
 .inputBar:focus-within {
   background: color-mix(in srgb, var(--bg-secondary) 92%, #ffffff);
   border-color: color-mix(in srgb, var(--accent) 52%, var(--border-strong));
   box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-whisper);
+}
+
+.inputBar:focus-within::before {
+  opacity: 0.15;
 }
 
 .textarea {
@@ -142,42 +266,63 @@
   outline: none;
   resize: none;
   overflow: hidden;
-  font-family: inherit;
+  font-family: var(--font-mono);
   line-height: 1.55;
   min-height: 24px;
   padding: 6px 2px;
+  letter-spacing: 0.02em;
 }
 
 .textarea::placeholder {
   color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-style: italic;
 }
 
+/* Palette Button */
 .attachBtn {
   width: 38px;
   height: 38px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
   background: var(--bg-primary);
   flex-shrink: 0;
+  position: relative;
+}
+
+.attachBtn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px dashed transparent;
+  transition: border-color var(--transition-fast), transform var(--transition-slow);
 }
 
 .attachBtn:hover {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-light);
+  transform: rotate(15deg);
 }
 
+.attachBtn:hover::before {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: rotate(-30deg);
+}
+
+/* Brush/Stamp Button */
 .sendBtn {
   width: 38px;
   height: 38px;
   background: var(--accent);
-  border-radius: var(--radius-md);
+  border-radius: 50% 50% 50% 20%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,17 +330,33 @@
   cursor: pointer;
   border: none;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 72%, #141413);
-  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), border-radius var(--transition-normal);
   flex-shrink: 0;
+  position: relative;
+}
+
+.sendBtn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, color-mix(in srgb, #ffffff 20%, transparent), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .sendBtn:hover {
   background: var(--accent-hover);
-  transform: scale(1.03);
+  transform: scale(1.05) rotate(-5deg);
+  border-radius: 50% 50% 20% 50%;
+}
+
+.sendBtn:hover::after {
+  opacity: 1;
 }
 
 .sendBtn:active {
-  transform: scale(0.97);
+  transform: scale(0.95) rotate(0deg);
 }
 
 .sendBtn:disabled {
@@ -204,21 +365,75 @@
   cursor: default;
   box-shadow: 0 0 0 1px var(--border-strong);
   transform: none;
+  border-radius: var(--radius-md);
 }
 
+.sendBtn:disabled::after {
+  display: none;
+}
+
+/* Stop Button - Ink Drop Style */
 .stopBtn {
   width: 38px;
   height: 38px;
   background: var(--error);
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-on-accent);
   cursor: pointer;
   border: none;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   flex-shrink: 0;
+  position: relative;
+}
+
+.stopBtn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, #ffffff 25%, transparent), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.stopBtn:hover {
+  background: #8f2929;
+  transform: scale(1.1);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--error) 40%, transparent);
+}
+
+.stopBtn:hover::before {
+  opacity: 1;
+}
+
+.stopBtn:active {
+  transform: scale(0.95);
+}
+
+/* Send Animation */
+.sendBtnAnimating {
+  animation: inkDrop 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes inkDrop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  30% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
 }
 
 @media (max-width: 640px) {
@@ -232,13 +447,81 @@
     width: 36px;
     height: 36px;
   }
+  .extraToggle {
+    font-size: var(--font-size-xs);
+  }
 }
 
-.stopBtn:hover {
-  background: #8f2929;
-  transform: scale(1.03);
+/* Dark Mode Enhancements */
+[data-theme="dark"] .inputBar {
+  background: #161b22;
+  border-color: #30363d;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
-.stopBtn:active {
-  transform: scale(0.97);
+[data-theme="dark"] .inputBar:focus-within {
+  background: #1a1f26;
+  border-color: color-mix(in srgb, var(--accent) 60%, #30363d);
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.2), 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .inputBar:focus-within::before {
+  opacity: 0.25;
+}
+
+[data-theme="dark"] .sendBtn {
+  background: var(--gradient-champagne);
+  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.3), 0 2px 8px rgba(212, 165, 116, 0.2);
+}
+
+[data-theme="dark"] .sendBtn:hover {
+  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.5), 0 4px 16px rgba(212, 165, 116, 0.3);
+}
+
+[data-theme="dark"] .attachBtn {
+  background: #1c2128;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .attachBtn:hover {
+  background: #252b33;
+  border-color: var(--accent);
+}
+
+[data-theme="dark"] .referencePreview {
+  background: #161b22;
+  border-color: #21262d;
+}
+
+[data-theme="dark"] .referenceThumb {
+  background: #1c2128;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .referenceThumb:hover {
+  box-shadow: 0 4px 12px rgba(212, 165, 116, 0.15);
+}
+
+[data-theme="dark"] .extra {
+  background: #161b22;
+}
+
+[data-theme="dark"] .extraOpen {
+  border-color: #21262d;
+}
+
+[data-theme="dark"] .extraToggle {
+  color: #7d8590;
+}
+
+[data-theme="dark"] .extraToggle:hover {
+  background: #21262d;
+  border-color: #30363d;
+  color: #b0b8c4;
+}
+
+[data-theme="dark"] .extraToggleOpen {
+  background: #161b22;
+  border-color: #30363d;
+  color: #e6edf3;
 }
