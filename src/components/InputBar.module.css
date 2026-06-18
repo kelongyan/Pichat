@@ -266,7 +266,7 @@
   outline: none;
   resize: none;
   overflow: hidden;
-  font-family: var(--font-mono);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.55;
   min-height: 24px;
   padding: 6px 2px;
@@ -454,15 +454,15 @@
 
 /* Dark Mode Enhancements */
 [data-theme="dark"] .inputBar {
-  background: #161b22;
-  border-color: #30363d;
+  background: #1e293b;
+  border-color: #475569;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] .inputBar:focus-within {
-  background: #1a1f26;
-  border-color: color-mix(in srgb, var(--accent) 60%, #30363d);
-  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.2), 0 4px 24px rgba(0, 0, 0, 0.3);
+  background: #334155;
+  border-color: color-mix(in srgb, var(--accent) 60%, #475569);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] .inputBar:focus-within::before {
@@ -471,43 +471,43 @@
 
 [data-theme="dark"] .sendBtn {
   background: var(--gradient-champagne);
-  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.3), 0 2px 8px rgba(212, 165, 116, 0.2);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3), 0 2px 8px rgba(56, 189, 248, 0.2);
 }
 
 [data-theme="dark"] .sendBtn:hover {
-  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.5), 0 4px 16px rgba(212, 165, 116, 0.3);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5), 0 4px 16px rgba(56, 189, 248, 0.3);
 }
 
 [data-theme="dark"] .attachBtn {
-  background: #1c2128;
-  border-color: #30363d;
+  background: #334155;
+  border-color: #475569;
 }
 
 [data-theme="dark"] .attachBtn:hover {
-  background: #252b33;
+  background: #475569;
   border-color: var(--accent);
 }
 
 [data-theme="dark"] .referencePreview {
-  background: #161b22;
-  border-color: #21262d;
+  background: #1e293b;
+  border-color: #334155;
 }
 
 [data-theme="dark"] .referenceThumb {
-  background: #1c2128;
-  border-color: #30363d;
+  background: #334155;
+  border-color: #475569;
 }
 
 [data-theme="dark"] .referenceThumb:hover {
-  box-shadow: 0 4px 12px rgba(212, 165, 116, 0.15);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
 }
 
 [data-theme="dark"] .extra {
-  background: #161b22;
+  background: #1e293b;
 }
 
 [data-theme="dark"] .extraOpen {
-  border-color: #21262d;
+  border-color: #334155;
 }
 
 [data-theme="dark"] .extraToggle {
@@ -515,13 +515,13 @@
 }
 
 [data-theme="dark"] .extraToggle:hover {
-  background: #21262d;
-  border-color: #30363d;
+  background: #334155;
+  border-color: #475569;
   color: #b0b8c4;
 }
 
 [data-theme="dark"] .extraToggleOpen {
-  background: #161b22;
-  border-color: #30363d;
+  background: #1e293b;
+  border-color: #475569;
   color: #e6edf3;
 }

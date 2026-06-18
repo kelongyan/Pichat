@@ -1,20 +1,20 @@
 /* =======================================================
    Pichat — Design Tokens
-   深邃墨蓝 · 午夜画廊 · 香槟金点缀
+   冰川白 · 深海蓝 · 天蓝点缀
    ======================================================= */
 
 :root {
-  /* Colors - Light Theme (default) */
-  --bg-primary: #f8f7f4;
+  /* Colors - Light Theme (default) - Glacier White */
+  --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #eceae4;
-  --bg-hover: #e8e6e0;
-  --bg-chat-user: #eceae4;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #e2e8f0;
+  --bg-chat-user: #f1f5f9;
   --bg-chat-ai: #ffffff;
 
-  --border: #e8e6e0;
-  --border-strong: #d4d2cc;
-  --border-subtle: #f0efe9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-subtle: #f1f5f9;
 
   --text-primary: #1a1a1a;
   --text-secondary: #5a5a58;
@@ -22,18 +22,18 @@
   --text-muted: #b0b0ae;
   --text-on-accent: #ffffff;
 
-  --accent: #c4956a;
-  --accent-hover: #b3845a;
-  --accent-light: #faf5ef;
-  --accent-coral: #d4a574;
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --accent-light: #f0f9ff;
+  --accent-coral: #38bdf8;
 
   --error: #dc3545;
   --error-light: #fef2f2;
   --success: #28a745;
   --success-light: #f0fdf4;
-  --focus-ring: rgba(196, 149, 106, 0.4);
+  --focus-ring: rgba(14, 165, 233, 0.35);
 
-  --ring: #d4d2cc;
+  --ring: #cbd5e1;
 
   /* Shadows */
   --shadow-sm: 0 0 0 1px var(--border-strong);
@@ -77,47 +77,47 @@
   --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Champagne Gold Gradient */
-  --gradient-champagne: linear-gradient(135deg, #c4956a 0%, #d4a574 50%, #e8b88a 100%);
-  --gradient-glow: linear-gradient(135deg, rgba(196, 149, 106, 0.2) 0%, rgba(212, 165, 116, 0.1) 100%);
+  /* Sky Blue Gradient */
+  --gradient-champagne: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #7dd3fc 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(56, 189, 248, 0.1) 100%);
 }
 
-/* Dark Theme - 午夜画廊 */
+/* Dark Theme - Deep Ocean */
 [data-theme="dark"] {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #1c2128;
-  --bg-hover: #252b33;
-  --bg-chat-user: #1c2128;
-  --bg-chat-ai: #161b22;
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #475569;
+  --bg-chat-user: #334155;
+  --bg-chat-ai: #1e293b;
 
-  --border: #21262d;
-  --border-strong: #30363d;
-  --border-subtle: #161b22;
+  --border: #334155;
+  --border-strong: #475569;
+  --border-subtle: #1e293b;
 
   --text-primary: #e6edf3;
   --text-secondary: #b0b8c4;
   --text-tertiary: #7d8590;
   --text-muted: #484f58;
-  --text-on-accent: #0d1117;
+  --text-on-accent: #0f172a;
 
-  --accent: #d4a574;
-  --accent-hover: #c4956a;
-  --accent-light: #1a1612;
-  --accent-coral: #e8b88a;
+  --accent: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --accent-light: #0c4a6e;
+  --accent-coral: #7dd3fc;
   --error: #f85149;
   --error-light: #1a0e0e;
   --success: #3fb950;
   --success-light: #0d1a12;
-  --focus-ring: rgba(212, 165, 116, 0.3);
+  --focus-ring: rgba(56, 189, 248, 0.3);
 
-  --ring: #30363d;
+  --ring: #475569;
   --shadow-sm: 0 0 0 1px var(--border-strong);
   --shadow-md: 0 0 0 1px var(--ring), 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4);
   --shadow-whisper: 0 4px 24px rgba(0, 0, 0, 0.3);
 
-  /* Champagne Gold Gradient - Dark Mode */
-  --gradient-champagne: linear-gradient(135deg, #d4a574 0%, #e8b88a 50%, #f0c8a0 100%);
-  --gradient-glow: linear-gradient(135deg, rgba(212, 165, 116, 0.15) 0%, rgba(232, 184, 138, 0.08) 100%);
+  /* Sky Blue Gradient - Dark Mode */
+  --gradient-champagne: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #7dd3fc 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(125, 211, 252, 0.08) 100%);
 }

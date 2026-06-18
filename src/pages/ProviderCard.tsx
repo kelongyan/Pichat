@@ -1,5 +1,7 @@
-import { Trash2 } from 'lucide-react';
+import { Trash2, List, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ProviderConfig } from '../types';
+import { fetchModels, isImageModel, type ModelInfo } from '../lib/settingsUtils';
 import styles from './Settings.module.css';
 
 interface ProviderCardProps {
@@ -23,6 +25,54 @@ export function ProviderCard({
   onUpdate,
   canRemove,
 }: ProviderCardProps) {
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [fetched, setFetched] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showDropdown]);
+
+  // Reset fetched state when baseURL or apiKey changes
+  useEffect(() => {
+    setFetched(false);
+    setModels([]);
+  }, [provider.baseURL, provider.apiKey]);
+
+  const handleOpenDropdown = useCallback(async () => {
+    if (showDropdown) {
+      setShowDropdown(false);
+      return;
+    }
+    if (!provider.baseURL.trim() || !provider.apiKey.trim()) return;
+    // Auto-fetch on first open
+    if (!fetched) {
+      setLoadingModels(true);
+      try {
+        const list = await fetchModels(provider);
+        setModels(list);
+        setFetched(true);
+        setShowDropdown(list.length > 0);
+      } catch {
+        setModels([]);
+        setFetched(true);
+      } finally {
+        setLoadingModels(false);
+      }
+    } else {
+      setShowDropdown(models.length > 0);
+    }
+  }, [provider, fetched, models, showDropdown]);
   return (
     <div className={`${styles.providerCard}${isDefault ? ` ${styles.providerCardDefault}` : ''}`}>
       <div className={styles.providerTop}>
@@ -50,37 +100,54 @@ export function ProviderCard({
           </div>
           <div className="form-group">
             <label className="form-label">Model</label>
-            <input className="form-input" type="text" value={provider.model} onChange={(e) => onUpdate({ model: e.target.value })} placeholder="gpt-image-2" />
+            <div className={styles.modelRow} ref={dropdownRef}>
+              <input
+                className={`form-input ${styles.modelInput}`}
+                type="text"
+                value={provider.model}
+                onChange={(e) => onUpdate({ model: e.target.value })}
+                placeholder="gpt-image-2"
+              />
+              <button
+                type="button"
+                className={styles.fetchBtn}
+                onClick={handleOpenDropdown}
+                disabled={!provider.baseURL.trim() || !provider.apiKey.trim()}
+                title="Fetch image models"
+              >
+                {loadingModels ? <Loader2 size={14} className={styles.spin} /> : <List size={14} />}
+              </button>
+              {showDropdown && models.length > 0 && (
+                <div className={styles.modelDropdown}>
+                  {models.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`${styles.modelOption}${provider.model === m.id ? ` ${styles.modelOptionActive}` : ''}`}
+                      onClick={() => { onUpdate({ model: m.id }); setShowDropdown(false); }}
+                    >
+                      <span className={styles.modelOptionId}>{m.id}</span>
+                      {m.owned_by && <span className={styles.modelOptionOwner}>{m.owned_by}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {provider.model && !isImageModel(provider.model) && (
+              <div className={styles.modelWarning}>
+                <AlertCircle size={12} />
+                <span>Not an image model — use gpt-image-2 or dall-e-3</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="form-group">
           <label className="form-label">Base URL</label>
           <input className="form-input" type="url" value={provider.baseURL} onChange={(e) => onUpdate({ baseURL: e.target.value })} placeholder="https://api.openai.com/v1" />
         </div>
-        <div className={styles.fieldsRow}>
-          <div className="form-group">
-            <label className="form-label">API Key</label>
-            <input className="form-input" type="password" value={provider.apiKey} onChange={(e) => onUpdate({ apiKey: e.target.value })} placeholder="sk-..." />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Protocol</label>
-            <div className={styles.pills}>
-              <button
-                type="button"
-                className={`${styles.pill}${(provider.protocol || 'responses') === 'responses' ? ` ${styles.pillActive}` : ''}`}
-                onClick={() => onUpdate({ protocol: 'responses' })}
-              >
-                Responses
-              </button>
-              <button
-                type="button"
-                className={`${styles.pill}${provider.protocol === 'images' ? ` ${styles.pillActive}` : ''}`}
-                onClick={() => onUpdate({ protocol: 'images' })}
-              >
-                Images
-              </button>
-            </div>
-          </div>
+        <div className="form-group">
+          <label className="form-label">API Key</label>
+          <input className="form-input" type="password" value={provider.apiKey} onChange={(e) => onUpdate({ apiKey: e.target.value })} placeholder="sk-..." />
         </div>
       </div>
     </div>

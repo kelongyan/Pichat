@@ -228,39 +228,39 @@
 }
 
 :global([data-theme="dark"]) .header {
-  background: color-mix(in srgb, #0d1117 92%, transparent);
-  border-bottom-color: #21262d;
+  background: color-mix(in srgb, #0f172a 92%, transparent);
+  border-bottom-color: #334155;
 }
 
 :global([data-theme="dark"]) .tabDot {
-  color: #484f58;
+  color: #64748b;
 }
 
 :global([data-theme="dark"]) .tabActive {
-  color: #d4a574;
+  color: #38bdf8;
 }
 
 :global([data-theme="dark"]) .btn {
-  background: #161b22;
-  box-shadow: 0 0 0 1px #30363d;
+  background: #1e293b;
+  box-shadow: 0 0 0 1px #475569;
 }
 
 :global([data-theme="dark"]) .btn:hover {
-  background: #21262d;
+  background: #334155;
 }
 
 :global([data-theme="dark"]) .iconBtn {
-  background: rgba(22, 27, 34, 0.6);
+  background: rgba(30, 41, 59, 0.6);
 }
 
 :global([data-theme="dark"]) .iconBtn:hover {
-  background: #161b22;
-  border-color: #30363d;
+  background: #1e293b;
+  border-color: #475569;
 }
 
 :global([data-theme="dark"]) .mobileMenu {
-  background: color-mix(in srgb, #0d1117 96%, transparent);
-  border-bottom-color: #21262d;
+  background: color-mix(in srgb, #0f172a 96%, transparent);
+  border-bottom-color: #334155;
 }
 
 @media (max-width: 640px) {

@@ -162,8 +162,14 @@ function FullSettings({ config }: { config: Config }) {
     if (error) { showToast(error, { type: 'error' }); return; }
     setTestingId(provider.id);
     try {
-      await testProviderConnection(sanitized);
-      showToast(`${sanitized.name} connected successfully`, { type: 'success' });
+      const result = await testProviderConnection(sanitized);
+      // Auto-detect protocol: update if different from current
+      if (result.protocol !== (provider.protocol || 'responses')) {
+        updateProvider(provider.id, { protocol: result.protocol });
+        showToast(`${sanitized.name} connected — detected ${result.protocol} protocol`, { type: 'success' });
+      } else {
+        showToast(`${sanitized.name} connected successfully`, { type: 'success' });
+      }
     } catch {
       showToast(`${sanitized.name} connection failed`, { type: 'error' });
     } finally {
