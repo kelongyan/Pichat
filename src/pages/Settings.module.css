@@ -337,6 +337,32 @@
   margin-top: 3px;
 }
 
+.capabilityRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.capabilityBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.capabilityBadgeActive {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-light) 50%, transparent);
+}
+
 .providerActions {
   display: flex;
   align-items: center;
@@ -548,8 +574,13 @@
 
 .fieldsRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr auto;
   gap: var(--space-3);
+}
+
+.protocolSelect {
+  min-width: 140px;
+  cursor: pointer;
 }
 
 /* ---- Action Row ---- */

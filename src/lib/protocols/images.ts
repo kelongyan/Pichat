@@ -3,6 +3,7 @@ import type {
   GenerateImageResult,
   ProtocolAdapter,
 } from '../../types';
+import { normalizeImagesResponse } from './generationResponse.ts';
 
 export function createImagesAdapter(): ProtocolAdapter {
   return {
@@ -47,9 +48,8 @@ export function createImagesAdapter(): ProtocolAdapter {
 
     async parseResponse(response) {
       const data = await response.json();
-      const imageBase64 = data.data?.[0]?.b64_json || data.data?.[0]?.url || null;
-      const text = data.data?.[0]?.revised_prompt || null;
-      return { text, imageBase64, raw: data };
+      const result = normalizeImagesResponse(data);
+      return { text: result.text, imageSource: result.imageSource, imageBase64: result.imageSource, raw: data };
     },
   };
 }

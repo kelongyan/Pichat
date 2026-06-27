@@ -41,14 +41,21 @@ export function ConnectView() {
     try {
       const now = Date.now();
       const provider: ProviderConfig = { id: generateId(), name: n, baseURL: b, apiKey: k, model: m, createdAt: now, updatedAt: now };
-      await testProviderConnection(provider);
+      const testResult = await testProviderConnection(provider);
+      provider.protocol = testResult.protocol;
+      provider.baseURL = testResult.baseURL;
+      provider.capabilities = testResult.capabilities;
       saveConfig({
         providers: [provider],
         defaultProviderId: provider.id,
         darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
         useSystemPrompt: true,
       });
-      showToast('Connected successfully', { type: 'success' });
+      if (!testResult.authOk) {
+        showToast('Connected — but API key authentication failed. Please verify your API key.', { type: 'error' });
+      } else {
+        showToast(`Connected successfully (${testResult.protocol} protocol)`, { type: 'success' });
+      }
       navigate('/create');
     } catch {
       showToast('Connection failed — settings were not saved', { type: 'error' });

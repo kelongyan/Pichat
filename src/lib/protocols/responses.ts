@@ -5,6 +5,7 @@ import type {
   ProtocolAdapter,
   StreamDelta,
 } from '../../types';
+import { normalizeResponsesResponse } from './generationResponse.ts';
 
 interface ResponseOutputItem {
   type: string;
@@ -13,11 +14,6 @@ interface ResponseOutputItem {
   result?: string;
   image_base64?: string;
   b64_json?: string;
-}
-
-interface ParsedOutput {
-  text: string | null;
-  imageBase64: string | null;
 }
 
 interface InputMessage {
@@ -33,32 +29,6 @@ interface ToolConfig {
   type: 'image_generation';
   action: string;
   size?: string;
-}
-
-function parseResponseOutput(output: ResponseOutputItem[] | undefined): ParsedOutput {
-  let text: string | null = null;
-  let imageBase64: string | null = null;
-
-  for (const item of output || []) {
-    if (item.type === 'message' && item.content) {
-      for (const part of item.content) {
-        if (part.type === 'output_text' && part.text) {
-          text = text ? text + '\n' + part.text : part.text;
-        }
-        if (part.type === 'output_image') {
-          imageBase64 = part.image_base64 || part.result || part.b64_json || imageBase64;
-        }
-      }
-    }
-    if (item.type === 'image_generation_call') {
-      imageBase64 = item.result || item.image_base64 || item.b64_json || imageBase64;
-    }
-    if (item.type === 'output_image') {
-      imageBase64 = item.image_base64 || item.result || item.b64_json || imageBase64;
-    }
-  }
-
-  return { text, imageBase64 };
 }
 
 function getMessageImageUrls(msg: Message): string[] {
@@ -139,11 +109,11 @@ export function createResponsesAdapter(): ProtocolAdapter {
 
     async parseResponse(response) {
       const data = await response.json();
-      const result = parseResponseOutput(data.output);
-      if (!result.text && !result.imageBase64) {
+      const result = normalizeResponsesResponse(data);
+      if (!result.text && !result.imageSource) {
         throw new Error('The API returned an empty response — the model may not support this request, or content was filtered.');
       }
-      return { ...result, raw: data };
+      return { text: result.text, imageSource: result.imageSource, imageBase64: result.imageSource, raw: data };
     },
 
     async readStream(response, onStream) {
@@ -239,11 +209,12 @@ export function createResponsesAdapter(): ProtocolAdapter {
       }
 
       if (finalData) {
-        const output = finalData.response?.output || finalData.output;
-        const result = parseResponseOutput(output);
+        const result = normalizeResponsesResponse(finalData);
+        const imageSource = result.imageSource ?? accImage;
         return {
           text: result.text ?? accText,
-          imageBase64: result.imageBase64 ?? accImage,
+          imageSource,
+          imageBase64: imageSource,
           raw: finalData,
         };
       }
@@ -252,7 +223,7 @@ export function createResponsesAdapter(): ProtocolAdapter {
         throw new Error('The API stream ended without content — the model may not support this request, or content was filtered.');
       }
 
-      return { text: accText, imageBase64: accImage, raw: null };
+      return { text: accText, imageSource: accImage, imageBase64: accImage, raw: null };
     },
   };
 }

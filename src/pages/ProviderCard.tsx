@@ -73,12 +73,32 @@ export function ProviderCard({
       setShowDropdown(models.length > 0);
     }
   }, [provider, fetched, models, showDropdown]);
+
+  const capabilityBadges = provider.capabilities
+    ? [
+      { label: 'Responses', active: provider.capabilities.responses },
+      { label: 'Images', active: provider.capabilities.images },
+      { label: 'Stream', active: provider.capabilities.streaming },
+      { label: 'Edit', active: provider.capabilities.editing },
+    ]
+    : [{ label: 'Unverified', active: false }];
+
   return (
     <div className={`${styles.providerCard}${isDefault ? ` ${styles.providerCardDefault}` : ''}`}>
       <div className={styles.providerTop}>
         <div className={styles.providerInfo}>
           <div className={styles.providerName}>{provider.name || 'Untitled'}</div>
           <div className={styles.providerMeta}>{provider.model} &middot; {provider.protocol || 'responses'}</div>
+          <div className={styles.capabilityRow}>
+            {capabilityBadges.map((badge) => (
+              <span
+                key={badge.label}
+                className={`${styles.capabilityBadge}${badge.active ? ` ${styles.capabilityBadgeActive}` : ''}`}
+              >
+                {badge.label}
+              </span>
+            ))}
+          </div>
         </div>
         <div className={styles.providerActions}>
           <button className={styles.providerBtn} type="button" disabled={isDefault} onClick={onSetDefault}>
@@ -139,6 +159,17 @@ export function ProviderCard({
                 <span>Not an image model — use gpt-image-2 or dall-e-3</span>
               </div>
             )}
+          </div>
+          <div className="form-group">
+            <label className="form-label">Protocol</label>
+            <select
+              className={`form-input ${styles.protocolSelect}`}
+              value={provider.protocol || 'responses'}
+              onChange={(e) => onUpdate({ protocol: e.target.value as 'responses' | 'images' })}
+            >
+              <option value="responses">Responses API</option>
+              <option value="images">Images API</option>
+            </select>
           </div>
         </div>
         <div className="form-group">

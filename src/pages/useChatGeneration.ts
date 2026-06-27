@@ -11,6 +11,7 @@ import type { Conversation, Message, ProviderConfig, Variant } from '../types';
 import type { InputBarHandle, SendData } from '../components/InputBar';
 import { getReferenceImages } from './chatUtils';
 import type { StreamState } from './chatUtils';
+import { persistGeneratedImage } from './generationPersistence.ts';
 
 interface UseChatGenerationArgs {
   conversation: Conversation | null;
@@ -79,8 +80,12 @@ export function useChatGeneration({
       });
       if (ctrl.signal.aborted) return null;
 
-      const imageId = result.imageBase64 ? await saveImage(result.imageBase64) : undefined;
+      const imageSource = result.imageSource ?? result.imageBase64;
+      const persistedImage = await persistGeneratedImage(imageSource, saveImage);
       if (ctrl.signal.aborted) return null;
+      if (persistedImage.persistError) {
+        toast.show(`Image generated, but local save failed: ${persistedImage.persistError}`, { type: 'error' });
+      }
 
       recordGenerationOutcome({
         providerId: args.provider?.id || args.providerId || 'unknown',
@@ -93,8 +98,8 @@ export function useChatGeneration({
       return {
         variant: {
           text: result.text || undefined,
-          imageId,
-          imageBase64: !imageId && result.imageBase64 ? result.imageBase64 : undefined,
+          imageId: persistedImage.imageId,
+          imageBase64: persistedImage.imageBase64,
           providerId: args.provider?.id,
           providerName: args.provider?.name,
           model: args.provider?.model,

@@ -1,4 +1,5 @@
 import { getDB } from './db';
+import { imageSourceToBlob, toImageDataUrl } from './imageSource.ts';
 import { generateId } from './utils';
 
 const IMAGES_STORE = 'images';
@@ -60,41 +61,6 @@ const thumbCache = new LruUrlCache();
 const inflightFull = new Map<string, Promise<string>>();
 const inflightThumb = new Map<string, Promise<string>>();
 
-function stripDataUrlPrefix(value: string): string {
-  const match = value.match(/^data:([^;,]+)?(?:;base64)?,(.*)$/s);
-  return match ? match[2] : value;
-}
-
-function inferImageMime(value: string): string {
-  const dataUrlMatch = value.match(/^data:([^;,]+)(?:;base64)?,/);
-  if (dataUrlMatch?.[1]) return dataUrlMatch[1];
-
-  const base64 = stripDataUrlPrefix(value);
-  if (base64.startsWith('/9j/')) return 'image/jpeg';
-  if (base64.startsWith('iVBORw0KGgo')) return 'image/png';
-  if (base64.startsWith('UklGR')) return 'image/webp';
-  if (base64.startsWith('R0lGOD')) return 'image/gif';
-  if (base64.startsWith('PD94bWwg') || base64.startsWith('PHN2Zy')) return 'image/svg+xml';
-  return 'image/png';
-}
-
-export function toImageDataUrl(value: string): string {
-  if (!value) return '';
-  if (value.startsWith('data:')) return value;
-  return `data:${inferImageMime(value)};base64,${stripDataUrlPrefix(value)}`;
-}
-
-function base64ToBlob(base64: string, mime = inferImageMime(base64)): Blob {
-  const normalized = stripDataUrlPrefix(base64);
-  const byteString = atob(normalized);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([ab], { type: mime });
-}
-
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -142,11 +108,11 @@ async function generateThumbnail(blob: Blob, maxSize = 200): Promise<Blob> {
   return canvas.convertToBlob({ type: useWebp ? 'image/webp' : 'image/jpeg', quality: 0.72 });
 }
 
-export async function saveImage(base64: string): Promise<string> {
+export async function saveImage(source: string): Promise<string> {
   const database = getDB();
   if (!database) throw new Error('DB not initialized');
   const id = generateId();
-  const blob = base64ToBlob(base64);
+  const blob = await imageSourceToBlob(source);
   const thumbBlob = await generateThumbnail(blob);
 
   const tx = database.transaction(IMAGES_STORE, 'readwrite');
@@ -291,3 +257,4 @@ export async function compressImage(dataUrl: string, maxEdge = 2048, quality = 0
 }
 
 export { IMAGES_STORE };
+export { toImageDataUrl };

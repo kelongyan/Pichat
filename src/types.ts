@@ -7,6 +7,16 @@ export interface Config {
 
 export type Protocol = 'responses' | 'images';
 
+export interface ProviderCapabilities {
+  responses: boolean;
+  images: boolean;
+  streaming: boolean;
+  editing: boolean;
+  authOk: boolean;
+  reachable: boolean;
+  checkedAt: number;
+}
+
 export interface ProviderConfig {
   id: string;
   name: string;
@@ -14,6 +24,7 @@ export interface ProviderConfig {
   apiKey: string;
   model: string;
   protocol?: Protocol;
+  capabilities?: ProviderCapabilities;
   createdAt: number;
   updatedAt: number;
 }
@@ -87,6 +98,7 @@ export interface GenerateImageParams {
 
 export interface GenerateImageResult {
   text: string | null;
+  imageSource?: string | null;
   imageBase64: string | null;
   raw: unknown;
 }

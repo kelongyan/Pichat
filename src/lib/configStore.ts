@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Config, ProviderConfig } from '../types';
 import { generateId } from './utils';
+import { normalizeProviderCapabilities } from './providerCapabilities.ts';
 
 const CONFIG_KEY = 'gpt2image_config';
 
@@ -43,6 +44,7 @@ function normalizeProvider(raw: unknown, index: number): ProviderConfig | null {
     protocol: (provider.protocol === 'responses' || provider.protocol === 'images')
       ? provider.protocol
       : 'responses' as const,
+    capabilities: normalizeProviderCapabilities(provider.capabilities),
     createdAt: typeof provider.createdAt === 'number' ? provider.createdAt : now,
     updatedAt: typeof provider.updatedAt === 'number' ? provider.updatedAt : now,
   };

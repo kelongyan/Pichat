@@ -42,7 +42,6 @@ function createProvider(name = 'New Provider'): ProviderConfig {
     baseURL: '',
     apiKey: '',
     model: 'gpt-image-2',
-    protocol: 'responses',
     createdAt: now,
     updatedAt: now,
   };
@@ -163,13 +162,19 @@ function FullSettings({ config }: { config: Config }) {
     setTestingId(provider.id);
     try {
       const result = await testProviderConnection(sanitized);
-      // Auto-detect protocol: update if different from current
+      const patch: Partial<ProviderConfig> = {};
       if (result.protocol !== (provider.protocol || 'responses')) {
-        updateProvider(provider.id, { protocol: result.protocol });
-        showToast(`${sanitized.name} connected — detected ${result.protocol} protocol`, { type: 'success' });
-      } else {
-        showToast(`${sanitized.name} connected successfully`, { type: 'success' });
+        patch.protocol = result.protocol;
       }
+      if (result.baseURL !== sanitized.baseURL) {
+        patch.baseURL = result.baseURL;
+      }
+      patch.capabilities = result.capabilities;
+      if (Object.keys(patch).length > 0) {
+        updateProvider(provider.id, patch);
+      }
+      const authNote = result.authOk ? '' : ' (auth failed — check API key)';
+      showToast(`${sanitized.name} connected — ${result.protocol} protocol${authNote}`, { type: result.authOk ? 'success' : 'error' });
     } catch {
       showToast(`${sanitized.name} connection failed`, { type: 'error' });
     } finally {
@@ -190,7 +195,16 @@ function FullSettings({ config }: { config: Config }) {
 
   async function runHealthCheck(provider: ProviderConfig) {
     try {
-      await testProviderConnection(provider);
+      const result = await testProviderConnection(provider);
+      setProviders((prev) => {
+        const updated = prev.map((p) => (
+          p.id === provider.id
+            ? { ...p, protocol: result.protocol, baseURL: result.baseURL, capabilities: result.capabilities }
+            : p
+        ));
+        saveConfig({ providers: updated.map(sanitizeProvider), defaultProviderId: defaultProviderId, darkMode: config.darkMode ?? false, useSystemPrompt });
+        return updated;
+      });
       showToast(`${provider.name} looks healthy`, { type: 'success' });
     } catch {
       showToast(`${provider.name} did not respond — check API key and base URL`, { type: 'error' });

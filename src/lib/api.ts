@@ -1,9 +1,17 @@
 import { useConfigStore } from './store';
 import { getProtocolAdapter } from './protocols/router';
+import { getApiBaseURLCandidates, isHtmlContentType, normalizeApiBaseURL } from './baseUrl.ts';
+import {
+  planGenerationAttempts,
+  shouldParseStreamAsJson,
+  shouldTryFallbackProtocol,
+} from './generationStrategy.ts';
 import type {
   Config,
   GenerateImageParams,
   GenerateImageResult,
+  Protocol,
+  ProtocolAdapter,
   ProviderConfig,
 } from '../types';
 
@@ -64,14 +72,24 @@ async function classifyFetchError(err: unknown, url?: string): Promise<Error> {
   return new ApiError(`Network error: ${msg}`, 'network');
 }
 
-function classifyHttpError(status: number, detail: string): Error {
+function classifyHttpError(status: number, detail: string, endpoint?: string): Error {
   switch (status) {
     case 401:
-      return new ApiError('Authentication failed — check your API Key in Settings.', 'auth');
+      return new ApiError(
+        endpoint === '/responses'
+          ? 'Authentication failed — your API key may be invalid, or this provider may not support the Responses protocol. Try switching to Images protocol in Settings.'
+          : 'Authentication failed — check your API Key in Settings.',
+        'auth',
+      );
     case 403:
       return new ApiError('Access denied — your API key may lack the required permissions.', 'auth');
     case 404:
-      return new ApiError('API endpoint not found — verify your API Base URL in Settings.', 'not-found');
+      return new ApiError(
+        endpoint === '/responses'
+          ? 'Responses API endpoint not available — this provider may only support the Images API.'
+          : 'API endpoint not found — verify your API Base URL in Settings.',
+        'not-found',
+      );
     case 429:
       return new ApiError('Rate limit exceeded — please wait a moment and try again.', 'rate-limit');
     case 500:
@@ -171,6 +189,134 @@ function resolveProvider(config: Config, providerId?: string): ProviderConfig {
   return provider;
 }
 
+function persistProviderPatch(providerId: string, patch: Partial<ProviderConfig>) {
+  const config = getConfig();
+  if (!config) return;
+  const updated: Config = {
+    ...config,
+    providers: config.providers.map((p) =>
+      p.id === providerId ? { ...p, ...patch, updatedAt: Date.now() } : p,
+    ),
+  };
+  useConfigStore.getState().save(updated);
+}
+
+function persistSuccessfulProviderState(provider: ProviderConfig, protocol: Protocol, baseURL: string) {
+  const patch: Partial<ProviderConfig> = {};
+  if ((provider.protocol || 'responses') !== protocol) {
+    patch.protocol = protocol;
+  }
+  if (normalizeApiBaseURL(provider.baseURL) !== normalizeApiBaseURL(baseURL)) {
+    patch.baseURL = baseURL;
+  }
+  if (Object.keys(patch).length > 0) {
+    persistProviderPatch(provider.id, patch);
+  }
+}
+
+function parseErrorDetail(text: string): string {
+  try {
+    const data = JSON.parse(text) as { error?: { message?: string }; message?: string };
+    return data.error?.message || data.message || text;
+  } catch {
+    return text;
+  }
+}
+
+interface ProtocolFailure {
+  protocol: Protocol;
+  endpoint: string;
+  status: number;
+  detail: string;
+}
+
+function buildProtocolFailureError(provider: ProviderConfig, failures: ProtocolFailure[]): Error {
+  const last = failures[failures.length - 1];
+  if (!last) {
+    return new ApiError('Generation failed before the API returned a response.', 'unknown');
+  }
+
+  if (failures.length === 1) {
+    return classifyHttpError(last.status, last.detail, last.endpoint);
+  }
+
+  const lines = failures.map((failure) =>
+    `${failure.endpoint} (${failure.protocol}) -> HTTP ${failure.status}: ${failure.detail}`,
+  );
+
+  return new ApiError(
+    `Both API protocols failed for "${provider.name}".\n`
+    + `${lines.join('\n')}\n`
+    + 'Check that your API Base URL and Key are correct, and that your provider supports image generation.',
+    'unknown',
+  );
+}
+
+interface AdapterRequestResult {
+  response: Response;
+  url: string;
+  baseURL: string;
+}
+
+async function postAdapterRequest(
+  provider: ProviderConfig,
+  adapter: ProtocolAdapter,
+  payload: unknown,
+  signal: AbortSignal,
+): Promise<AdapterRequestResult> {
+  const candidates = getApiBaseURLCandidates(provider.baseURL);
+  const suggested = candidates.find((baseURL) => baseURL !== normalizeApiBaseURL(provider.baseURL));
+  let lastUrl = '';
+
+  for (const baseURL of candidates) {
+    const url = `${baseURL}${adapter.getEndpoint()}`;
+    lastUrl = url;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (isHtmlContentType(response.headers.get('content-type'))) {
+      continue;
+    }
+
+    return { response, url, baseURL };
+  }
+
+  throw new ApiError(
+    suggested
+      ? `API Base URL returned a web page instead of an API response. Pichat will try "${suggested}" automatically; if this keeps happening, set the provider Base URL to "${suggested}" in Settings.`
+      : `API Base URL returned a web page instead of an API response: ${lastUrl}`,
+    'not-found',
+  );
+}
+
+async function readAdapterResult(
+  adapter: ProtocolAdapter,
+  response: Response,
+  onStream?: (delta: { text: string | null; imageBase64: string | null; done?: boolean }) => void,
+): Promise<GenerateImageResult> {
+  const useStreamReader = !!onStream
+    && adapter.supportsStreaming
+    && adapter.readStream
+    && !shouldParseStreamAsJson(response.headers.get('content-type'));
+
+  const result = useStreamReader
+    ? await adapter.readStream!(response, onStream)
+    : await adapter.parseResponse(response);
+
+  if (onStream && !useStreamReader) {
+    onStream({ text: result.text, imageBase64: result.imageBase64, done: true });
+  }
+
+  return result;
+}
+
 export async function generateImage({
   prompt,
   size = '1024x1024',
@@ -184,95 +330,110 @@ export async function generateImage({
   const config = getConfig();
   if (!config) throw new Error('Not configured');
   const provider = resolveProvider(config, providerId);
-  const adapter = getProtocolAdapter(provider);
-
-  if (action === 'edit' && images.length > 0 && !adapter.supportsEditing) {
-    throw new Error(
-      'Image editing is not supported by the Images API protocol. Switch to a Responses API provider for editing.'
-    );
-  }
 
   const instructions = await getSystemPrompt(config.useSystemPrompt !== false);
-  const payload = adapter.buildPayload({
-    provider,
-    prompt,
-    size,
+  const plannedAttempts = planGenerationAttempts({
+    protocol: provider.protocol || 'responses',
+    capabilities: provider.capabilities,
     action,
-    images,
-    history,
-    instructions,
-    stream: !!onStream,
+    imageCount: images.length,
+    wantsStream: !!onStream,
   });
+  const failures: ProtocolFailure[] = [];
 
-  const url = `${provider.baseURL.replace(/\/+$/, '')}${adapter.getEndpoint()}`;
-  let response: Response;
-  let lastError: Error | null = null;
-  const maxAttempts = (onStream && adapter.supportsStreaming) ? 1 : MAX_RETRIES + 1;
+  attempts: for (let attemptIndex = 0; attemptIndex < plannedAttempts.length; attemptIndex++) {
+    const planned = plannedAttempts[attemptIndex];
+    const attemptProvider: ProviderConfig = { ...provider, protocol: planned.protocol };
+    const adapter = getProtocolAdapter(attemptProvider);
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (attempt > 0) {
-      const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-      await sleep(delay);
-      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    }
-
-    try {
-      const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const combinedSignal = signal
-        ? AbortSignal.any([signal, timeoutSignal])
-        : timeoutSignal;
-
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${provider.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: combinedSignal,
+    if (action === 'edit' && images.length > 0 && !adapter.supportsEditing) {
+      failures.push({
+        protocol: planned.protocol,
+        endpoint: adapter.getEndpoint(),
+        status: 0,
+        detail: 'This protocol does not support reference image editing.',
       });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        throw err;
-      }
-      if (attempt < maxAttempts - 1) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        continue;
-      }
-      throw await classifyFetchError(err, url);
+      continue;
     }
 
-    if (!response!.ok) {
-      if (isRetryableStatus(response!.status) && attempt < maxAttempts - 1) {
-        lastError = classifyHttpError(response!.status, '');
-        continue;
+    const payload = adapter.buildPayload({
+      provider: attemptProvider,
+      prompt,
+      size,
+      action,
+      images,
+      history,
+      instructions,
+      stream: planned.stream && adapter.supportsStreaming,
+    });
+
+    const maxAttempts = planned.stream ? 1 : MAX_RETRIES + 1;
+    let requestUrl = '';
+
+    for (let retryIndex = 0; retryIndex < maxAttempts; retryIndex++) {
+      if (retryIndex > 0) {
+        const delay = RETRY_BASE_MS * Math.pow(2, retryIndex - 1);
+        await sleep(delay);
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       }
-      const text = await response!.text();
-      let detail = text;
+
+      let request: AdapterRequestResult;
       try {
-        detail = JSON.parse(text).error?.message || text;
-      } catch {
-        // keep raw text
+        const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+        const combinedSignal = signal
+          ? AbortSignal.any([signal, timeoutSignal])
+          : timeoutSignal;
+
+        request = await postAdapterRequest(attemptProvider, adapter, payload, combinedSignal);
+        requestUrl = request.url;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          throw err;
+        }
+        if (err instanceof ApiError) {
+          throw err;
+        }
+        if (retryIndex < maxAttempts - 1) {
+          continue;
+        }
+        throw await classifyFetchError(err, requestUrl);
       }
-      throw classifyHttpError(response!.status, detail);
-    }
 
-    lastError = null;
-    break;
+      const { response, baseURL } = request;
+
+      if (!response.ok) {
+        if (isRetryableStatus(response.status) && retryIndex < maxAttempts - 1) {
+          continue;
+        }
+
+        const endpoint = adapter.getEndpoint();
+        const detail = parseErrorDetail(await response.text());
+        failures.push({ protocol: planned.protocol, endpoint, status: response.status, detail });
+
+        if (
+          attemptIndex < plannedAttempts.length - 1
+          && shouldTryFallbackProtocol({
+            status: response.status,
+            endpoint,
+            action,
+            imageCount: images.length,
+          })
+        ) {
+          continue attempts;
+        }
+
+        throw buildProtocolFailureError(provider, failures);
+      }
+
+      const result = await readAdapterResult(
+        adapter,
+        response,
+        onStream,
+      );
+      persistSuccessfulProviderState(provider, planned.protocol, baseURL);
+      return result;
+    }
   }
 
-  if (lastError) throw lastError;
-
-  // 流式处理
-  if (onStream) {
-    if (adapter.supportsStreaming && adapter.readStream) {
-      return adapter.readStream(response!, onStream);
-    }
-    // 降级：非流式请求，结果返回后一次性回调
-    const result = await adapter.parseResponse(response!);
-    onStream({ text: result.text, imageBase64: result.imageBase64, done: true });
-    return result;
-  }
-
-  return adapter.parseResponse(response!);
+  throw buildProtocolFailureError(provider, failures);
 }
